@@ -18,3 +18,5 @@ data.salt
 # OS
 .DS_Store
 Thumbs.db
+.claude/
+release/

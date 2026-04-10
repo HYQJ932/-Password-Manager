@@ -5,7 +5,12 @@ import json
 import os
 from src.data_store import DataStore
 from src.generators import generate_password, generate_username
-from src.totp import generate_totp_secret, get_totp_code, get_totp_uri, verify_totp
+from src.totp import (
+    generate_totp_secret, generate_hotp_secret,
+    get_totp_code, get_hotp_code,
+    get_totp_uri, get_hotp_uri,
+    verify_totp, verify_hotp,
+)
 
 
 def parse_otpauth_uri(uri: str) -> dict:
@@ -145,12 +150,25 @@ class PasswordManagerApp:
         )
         gen_btn.pack(pady=5)
 
-        # TOTP button
+        # 2FA button
         totp_btn = ctk.CTkButton(
-            self.sidebar, text="🔑 2FA 验证码",
-            command=self._show_totp_panel, width=180,
+            self.sidebar, text="🔑 OTP 验证码",
+            command=self._show_otp_panel, width=180,
         )
         totp_btn.pack(pady=5)
+
+        # Import/Export OTP
+        import_btn = ctk.CTkButton(
+            self.sidebar, text="📥 导入 OTP",
+            command=self._import_otp, width=180,
+        )
+        import_btn.pack(pady=5)
+
+        export_btn = ctk.CTkButton(
+            self.sidebar, text="📤 导出 OTP",
+            command=self._export_otp, width=180,
+        )
+        export_btn.pack(pady=5)
 
         # Separator
         sep = ctk.CTkFrame(self.sidebar, height=2, fg_color="#444444")
@@ -310,24 +328,32 @@ class PasswordManagerApp:
         )
         user_lbl.grid(row=0, column=0, sticky="w")
 
-        # TOTP
-        totp_frame = ctk.CTkFrame(self.entry_frame, fg_color="transparent")
-        totp_frame.grid(row=row, column=2, sticky="w", padx=5, pady=3)
+        # OTP column
+        otp_frame = ctk.CTkFrame(self.entry_frame, fg_color="transparent")
+        otp_frame.grid(row=row, column=2, sticky="w", padx=5, pady=3)
 
-        secret = entry.get("totp_secret", "")
-        if secret:
-            code, remaining = get_totp_code(secret)
-            totp_text = f"{code} ({remaining}s)" if code else "无"
+        otp_type = entry.get("otp_type", "")
+        otp_secret = entry.get("otp_secret", "")
+        if otp_type == "totp" and otp_secret:
+            code, remaining = get_totp_code(otp_secret)
+            otp_text = f"{code} ({remaining}s)" if code else "无"
+            otp_color = "#2ecc71"
+        elif otp_type == "hotp" and otp_secret:
+            counter = entry.get("hotp_counter", 0)
+            code, _ = get_hotp_code(otp_secret, counter)
+            otp_text = f"{code} #{counter}" if code else f"#{counter}"
+            otp_color = "#3498db"
         else:
-            totp_text = "无"
+            otp_text = "无"
+            otp_color = "#888888"
 
-        totp_lbl = ctk.CTkLabel(
-            totp_frame, text=totp_text,
-            text_color="#2ecc71" if secret else "#888888",
+        otp_lbl = ctk.CTkLabel(
+            otp_frame, text=otp_text,
+            text_color=otp_color,
             font=ctk.CTkFont(family="monospace", size=13),
             anchor="w",
         )
-        totp_lbl.grid(row=0, column=0, sticky="w")
+        otp_lbl.grid(row=0, column=0, sticky="w")
 
         # Category
         cat_lbl = ctk.CTkLabel(
@@ -354,16 +380,17 @@ class PasswordManagerApp:
         )
         copy_pass_btn.pack(side="left", padx=2)
 
-        copy_totp_btn = ctk.CTkButton(
-            action_frame, text="TOTP", width=55, height=25,
-            font=ctk.CTkFont(size=10),
-            command=lambda e=entry: self._copy_totp(e),
-        )
-        copy_totp_btn.pack(side="left", padx=2)
+        if otp_type in ("totp", "hotp"):
+            copy_otp_btn = ctk.CTkButton(
+                action_frame, text="OTP", width=55, height=25,
+                font=ctk.CTkFont(size=10),
+                command=lambda e=entry: self._copy_otp(e),
+            )
+            copy_otp_btn.pack(side="left", padx=2)
 
         # Bind right-click and double-click on the row
-        for frame in [title_frame, user_frame, totp_frame, action_frame,
-                      title_lbl, user_lbl, totp_lbl, cat_lbl]:
+        for frame in [title_frame, user_frame, otp_frame, action_frame,
+                      title_lbl, user_lbl, otp_lbl, cat_lbl]:
             frame.bind("<Button-3>", lambda evt, e=entry: self._show_context_menu(evt, e))
             frame.bind("<Double-1>", lambda evt, e=entry: self._open_url(e))
 
@@ -373,11 +400,20 @@ class PasswordManagerApp:
         if text:
             pyperclip.copy(text)
 
-    def _copy_totp(self, entry):
-        secret = entry.get("totp_secret", "")
-        code, _ = get_totp_code(secret)
-        if code:
-            pyperclip.copy(code)
+    def _copy_otp(self, entry):
+        otp_type = entry.get("otp_type", "")
+        otp_secret = entry.get("otp_secret", "")
+        if otp_type == "totp" and otp_secret:
+            code, _ = get_totp_code(otp_secret)
+            if code:
+                pyperclip.copy(code)
+        elif otp_type == "hotp" and otp_secret:
+            counter = entry.get("hotp_counter", 0)
+            code, new_counter = get_hotp_code(otp_secret, counter)
+            if code:
+                pyperclip.copy(code)
+                # Auto-increment counter for HOTP
+                self.store.update_entry(entry["id"], {"hotp_counter": new_counter + 1})
 
     def _show_context_menu(self, event, entry):
         """Show right-click context menu."""
@@ -388,17 +424,20 @@ class PasswordManagerApp:
 
         menu.geometry(f"+{event.x_root}+{event.y_root}")
 
-        # Background frame
         bg = ctk.CTkFrame(menu, fg_color="#2b2b2b", corner_radius=8)
         bg.pack(fill="both", expand=True)
 
+        otp_type = entry.get("otp_type", "")
         actions = [
             ("复制用户名", lambda: (self._copy(entry.get("username", "")), menu.destroy())),
             ("复制密码", lambda: (self._copy(entry.get("password", "")), menu.destroy())),
-            ("复制TOTP", lambda: (self._copy_totp(entry), menu.destroy())),
+        ]
+        if otp_type in ("totp", "hotp"):
+            actions.append(("复制OTP", lambda: (self._copy_otp(entry), menu.destroy())))
+        actions.extend([
             ("编辑", lambda: (self._show_edit_dialog(entry), menu.destroy())),
             ("删除", lambda: (self._delete_entry(entry), menu.destroy())),
-        ]
+        ])
 
         url = entry.get("url", "").strip()
         if url:
@@ -433,7 +472,7 @@ class PasswordManagerApp:
     def _show_add_dialog(self):
         dialog = ctk.CTkToplevel(self.window)
         dialog.title("添加密码")
-        dialog.geometry("500x580")
+        dialog.geometry("520x650")
         dialog.transient(self.window)
         dialog.grab_set()
 
@@ -447,7 +486,6 @@ class PasswordManagerApp:
             ("网址", "url", ""),
             ("分类", "category", self.categories[0] if self.categories else "默认"),
             ("备注", "notes", ""),
-            ("TOTP密钥", "totp_secret", ""),
         ]
 
         for label, key, default in labels:
@@ -522,6 +560,73 @@ class PasswordManagerApp:
 
             row += 1
 
+        # --- OTP Section ---
+        ctk.CTkLabel(dialog, text="OTP 双因素认证",
+                     font=ctk.CTkFont(size=14, weight="bold")).grid(
+            row=row, column=0, columnspan=3, padx=15, pady=(10, 5), sticky="w")
+        row += 1
+
+        # OTP type selector
+        otp_type_var = ctk.StringVar(value="无")
+        type_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        type_frame.grid(row=row, column=0, columnspan=3, padx=15, pady=5, sticky="w")
+
+        for opt in ["无", "TOTP", "HOTP"]:
+            ctk.CTkRadioButton(type_frame, text=opt, variable=otp_type_var, value=opt).pack(side="left", padx=10)
+        row += 1
+
+        # OTP secret
+        ctk.CTkLabel(dialog, text="密钥").grid(row=row, column=0, padx=15, pady=8, sticky="w")
+        otp_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        otp_frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        otp_entry = ctk.CTkEntry(otp_frame, width=220)
+        otp_entry.pack(side="left")
+        fields["_otp_secret"] = otp_entry
+
+        def _gen_otp():
+            t = otp_type_var.get()
+            otp_entry.delete(0, "end")
+            if t == "TOTP":
+                otp_entry.insert(0, generate_totp_secret())
+            elif t == "HOTP":
+                otp_entry.insert(0, generate_hotp_secret())
+
+        def _parse_otp_uri():
+            from tkinter import simpledialog
+            uri = simpledialog.askstring("从 URI 解析", "粘贴 otpauth:// URI:")
+            if uri:
+                info = parse_otpauth_uri(uri)
+                if info.get("secret"):
+                    otp_entry.delete(0, "end")
+                    otp_entry.insert(0, info["secret"])
+                    if info.get("type") == "hotp":
+                        otp_type_var.set("HOTP")
+                    elif info.get("type") == "totp":
+                        otp_type_var.set("TOTP")
+                    if info.get("counter"):
+                        hotp_counter_entry.delete(0, "end")
+                        hotp_counter_entry.insert(0, info["counter"])
+                    if info.get("account") and not fields.get("username", "").get():
+                        if isinstance(fields.get("username"), ctk.CTkEntry):
+                            fields["username"].delete(0, "end")
+                            fields["username"].insert(0, info["account"])
+                    if info.get("issuer") and not fields.get("title", "").get():
+                        if isinstance(fields.get("title"), ctk.CTkEntry):
+                            fields["title"].delete(0, "end")
+                            fields["title"].insert(0, info["issuer"])
+
+        ctk.CTkButton(otp_frame, text="生成", width=50, command=_gen_otp).pack(side="left", padx=2)
+        ctk.CTkButton(otp_frame, text="URI", width=50, command=_parse_otp_uri).pack(side="left", padx=2)
+        row += 1
+
+        # HOTP counter
+        ctk.CTkLabel(dialog, text="计数器").grid(row=row, column=0, padx=15, pady=8, sticky="w")
+        hotp_counter_entry = ctk.CTkEntry(dialog, width=80)
+        hotp_counter_entry.insert(0, "0")
+        hotp_counter_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        fields["_hotp_counter"] = hotp_counter_entry
+        row += 1
+
         # User style selector for username generation
         def save():
             data = {}
@@ -533,6 +638,26 @@ class PasswordManagerApp:
                 else:
                     data[key] = widget.get()
             data.setdefault("category", "默认")
+
+            # Add OTP fields
+            otp_type = otp_type_var.get()
+            otp_secret = otp_entry.get().strip()
+            if otp_type == "TOTP" and otp_secret:
+                data["otp_type"] = "totp"
+                data["otp_secret"] = otp_secret
+                data.pop("hotp_counter", None)
+            elif otp_type == "HOTP" and otp_secret:
+                data["otp_type"] = "hotp"
+                data["otp_secret"] = otp_secret
+                try:
+                    data["hotp_counter"] = int(hotp_counter_entry.get().strip() or "0")
+                except ValueError:
+                    data["hotp_counter"] = 0
+            else:
+                data["otp_type"] = ""
+                data["otp_secret"] = ""
+                data.pop("hotp_counter", None)
+
             self.store.add_entry(data)
             self._load_entries()
             dialog.destroy()
@@ -546,7 +671,7 @@ class PasswordManagerApp:
     def _show_edit_dialog(self, entry):
         dialog = ctk.CTkToplevel(self.window)
         dialog.title("编辑密码")
-        dialog.geometry("500x580")
+        dialog.geometry("520x650")
         dialog.transient(self.window)
         dialog.grab_set()
 
@@ -560,7 +685,6 @@ class PasswordManagerApp:
             ("网址", "url", entry.get("url", "")),
             ("分类", "category", entry.get("category", "默认")),
             ("备注", "notes", entry.get("notes", "")),
-            ("TOTP密钥", "totp_secret", entry.get("totp_secret", "")),
         ]
 
         for label, key, default in labels:
@@ -593,41 +717,6 @@ class PasswordManagerApp:
                 )
                 gen_btn.pack(side="left", padx=2)
                 fields[key] = entry_w
-            elif key == "totp_secret":
-                frame = ctk.CTkFrame(dialog, fg_color="transparent")
-                frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
-                entry_w = ctk.CTkEntry(frame, width=220)
-                entry_w.insert(0, default)
-                entry_w.pack(side="left")
-                gen_totp_btn = ctk.CTkButton(
-                    frame, text="生成", width=50,
-                    command=lambda e=entry_w: e.delete(0, "end") or e.insert(0, generate_totp_secret()),
-                )
-                gen_totp_btn.pack(side="left", padx=2)
-
-                def _parse_uri_edit():
-                    from tkinter import simpledialog
-                    uri = simpledialog.askstring("从 URI 解析", "粘贴 otpauth:// URI:")
-                    if uri:
-                        info = parse_otpauth_uri(uri)
-                        if info.get("secret"):
-                            entry_w.delete(0, "end")
-                            entry_w.insert(0, info["secret"])
-                        if info.get("account") and not fields.get("username", "").get():
-                            if isinstance(fields.get("username"), ctk.CTkEntry):
-                                fields["username"].delete(0, "end")
-                                fields["username"].insert(0, info["account"])
-                        if info.get("issuer") and not fields.get("title", "").get():
-                            if isinstance(fields.get("title"), ctk.CTkEntry):
-                                fields["title"].delete(0, "end")
-                                fields["title"].insert(0, info["issuer"])
-
-                parse_btn = ctk.CTkButton(
-                    frame, text="URI", width=50,
-                    command=_parse_uri_edit,
-                )
-                parse_btn.pack(side="left", padx=2)
-                fields[key] = entry_w
             elif key == "notes":
                 entry_w = ctk.CTkTextbox(dialog, width=300, height=60)
                 entry_w.insert("1.0", default)
@@ -639,13 +728,86 @@ class PasswordManagerApp:
                 entry_w.grid(row=row, column=1, padx=15, pady=8, sticky="w")
                 if key == "username":
                     gen_user_btn = ctk.CTkButton(
-                        dialog, text="生成", width=60,
+                        dialog, text="生成用户名", width=70,
                         command=lambda e=entry_w: e.delete(0, "end") or e.insert(0, generate_username()),
                     )
                     gen_user_btn.grid(row=row, column=2, padx=5, pady=8)
                 fields[key] = entry_w
 
             row += 1
+
+        # --- OTP Section ---
+        ctk.CTkLabel(dialog, text="OTP 双因素认证",
+                     font=ctk.CTkFont(size=14, weight="bold")).grid(
+            row=row, column=0, columnspan=3, padx=15, pady=(10, 5), sticky="w")
+        row += 1
+
+        existing_type = entry.get("otp_type", "")
+        if existing_type == "hotp":
+            otp_type_default = "HOTP"
+        elif existing_type == "totp":
+            otp_type_default = "TOTP"
+        else:
+            otp_type_default = "无"
+
+        otp_type_var = ctk.StringVar(value=otp_type_default)
+        type_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        type_frame.grid(row=row, column=0, columnspan=3, padx=15, pady=5, sticky="w")
+        for opt in ["无", "TOTP", "HOTP"]:
+            ctk.CTkRadioButton(type_frame, text=opt, variable=otp_type_var, value=opt).pack(side="left", padx=10)
+        row += 1
+
+        ctk.CTkLabel(dialog, text="密钥").grid(row=row, column=0, padx=15, pady=8, sticky="w")
+        otp_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        otp_frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        otp_entry = ctk.CTkEntry(otp_frame, width=220)
+        otp_entry.insert(0, entry.get("otp_secret", ""))
+        otp_entry.pack(side="left")
+        fields["_otp_secret"] = otp_entry
+
+        def _gen_otp_edit():
+            t = otp_type_var.get()
+            otp_entry.delete(0, "end")
+            if t == "TOTP":
+                otp_entry.insert(0, generate_totp_secret())
+            elif t == "HOTP":
+                otp_entry.insert(0, generate_hotp_secret())
+
+        def _parse_otp_uri_edit():
+            from tkinter import simpledialog
+            uri = simpledialog.askstring("从 URI 解析", "粘贴 otpauth:// URI:")
+            if uri:
+                info = parse_otpauth_uri(uri)
+                if info.get("secret"):
+                    otp_entry.delete(0, "end")
+                    otp_entry.insert(0, info["secret"])
+                    if info.get("type") == "hotp":
+                        otp_type_var.set("HOTP")
+                    elif info.get("type") == "totp":
+                        otp_type_var.set("TOTP")
+                    if info.get("counter"):
+                        hotp_counter_entry.delete(0, "end")
+                        hotp_counter_entry.insert(0, info["counter"])
+                    if info.get("account") and not fields.get("username", "").get():
+                        if isinstance(fields.get("username"), ctk.CTkEntry):
+                            fields["username"].delete(0, "end")
+                            fields["username"].insert(0, info["account"])
+                    if info.get("issuer") and not fields.get("title", "").get():
+                        if isinstance(fields.get("title"), ctk.CTkEntry):
+                            fields["title"].delete(0, "end")
+                            fields["title"].insert(0, info["issuer"])
+
+        ctk.CTkButton(otp_frame, text="生成", width=50, command=_gen_otp_edit).pack(side="left", padx=2)
+        ctk.CTkButton(otp_frame, text="URI", width=50, command=_parse_otp_uri_edit).pack(side="left", padx=2)
+        row += 1
+
+        hotp_counter_init = entry.get("hotp_counter", 0)
+        ctk.CTkLabel(dialog, text="计数器").grid(row=row, column=0, padx=15, pady=8, sticky="w")
+        hotp_counter_entry = ctk.CTkEntry(dialog, width=80)
+        hotp_counter_entry.insert(0, str(hotp_counter_init))
+        hotp_counter_entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+        fields["_hotp_counter"] = hotp_counter_entry
+        row += 1
 
         def save():
             data = {}
@@ -656,6 +818,25 @@ class PasswordManagerApp:
                     data[key] = widget.get()
                 else:
                     data[key] = widget.get()
+
+            otp_type = otp_type_var.get()
+            otp_secret = otp_entry.get().strip()
+            if otp_type == "TOTP" and otp_secret:
+                data["otp_type"] = "totp"
+                data["otp_secret"] = otp_secret
+                data.pop("hotp_counter", None)
+            elif otp_type == "HOTP" and otp_secret:
+                data["otp_type"] = "hotp"
+                data["otp_secret"] = otp_secret
+                try:
+                    data["hotp_counter"] = int(hotp_counter_entry.get().strip() or "0")
+                except ValueError:
+                    data["hotp_counter"] = 0
+            else:
+                data["otp_type"] = ""
+                data["otp_secret"] = ""
+                data.pop("hotp_counter", None)
+
             self.store.update_entry(entry["id"], data)
             self._load_entries()
             dialog.destroy()
@@ -833,176 +1014,258 @@ class PasswordManagerApp:
 
         ctk.CTkButton(dialog, text="关闭", command=dialog.destroy).pack(pady=10)
 
-    def _show_totp_panel(self):
-        """Show a dedicated TOTP codes panel with countdown timers."""
-        # Collect all entries with TOTP secrets
-        totp_entries = [e for e in self.entries if e.get("totp_secret", "").strip()]
+    def _show_otp_panel(self):
+        """Show OTP codes panel with countdown timers for TOTP and counter for HOTP."""
+        otp_entries = [e for e in self.entries if e.get("otp_type", "") in ("totp", "hotp")]
 
-        # Create floating window
-        totp_win = ctk.CTkToplevel(self.window)
-        totp_win.title("2FA 验证码")
-        totp_win.geometry("480x600")
-        totp_win.resizable(True, True)
-        totp_win.minsize(350, 300)
-        totp_win.attributes("-topmost", True)
+        win = ctk.CTkToplevel(self.window)
+        win.title("OTP 验证码")
+        win.geometry("520x650")
+        win.resizable(True, True)
+        win.minsize(400, 400)
+        win.attributes("-topmost", True)
 
-        # Header
         ctk.CTkLabel(
-            totp_win, text="双重验证码 (2FA)",
+            win, text="OTP 双因素验证码",
             font=ctk.CTkFont(size=18, weight="bold"),
         ).pack(pady=(15, 5))
 
         ctk.CTkLabel(
-            totp_win, text="点击验证码即可复制到剪贴板",
+            win, text="点击验证码即可复制 | TOTP 每 30s 刷新",
             font=ctk.CTkFont(size=11), text_color="#888888",
         ).pack(pady=(0, 10))
 
-        # Scrollable frame for TOTP items
-        scroll = ctk.CTkScrollableFrame(totp_win)
+        scroll = ctk.CTkScrollableFrame(win)
         scroll.pack(fill="both", expand=True, padx=15, pady=5)
 
-        # Store widgets for refresh
-        totp_widgets = []
+        widgets_list = []
 
-        def render_totp_items():
-            for w in scroll.winfo_children():
-                w.destroy()
-            totp_widgets.clear()
+        for entry in otp_entries:
+            title = entry.get("title", "未命名")
+            username = entry.get("username", "")
+            otp_type = entry.get("otp_type", "")
+            secret = entry.get("otp_secret", "").strip()
+            is_totp = (otp_type == "totp")
 
-            if not totp_entries:
+            container = ctk.CTkFrame(scroll, fg_color="#2a2a2a", corner_radius=10)
+            container.pack(fill="x", pady=4, padx=2)
+
+            # Info row
+            info_frame = ctk.CTkFrame(container, fg_color="transparent")
+            info_frame.pack(fill="x", padx=10, pady=(10, 2))
+
+            badge = "TOTP" if is_totp else "HOTP"
+            badge_color = "#3498db" if is_totp else "#9b59b6"
+            ctk.CTkLabel(
+                info_frame, text=f"[{badge}]",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                text_color=badge_color,
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                info_frame, text=title,
+                font=ctk.CTkFont(size=14, weight="bold"),
+                anchor="w",
+            ).pack(side="left", padx=(8, 0))
+
+            if username:
                 ctk.CTkLabel(
-                    scroll, text="暂无 2FA 验证码\n编辑账号并填入 TOTP 密钥即可添加",
-                    font=ctk.CTkFont(size=14), text_color="#888888",
-                ).pack(pady=50)
-                return
-
-            for entry in totp_entries:
-                title = entry.get("title", "未命名")
-                username = entry.get("username", "")
-                secret = entry.get("totp_secret", "").strip()
-
-                # Container
-                container = ctk.CTkFrame(scroll, fg_color="#2a2a2a", corner_radius=10)
-                container.pack(fill="x", pady=4, padx=2)
-
-                # Info row
-                info_frame = ctk.CTkFrame(container, fg_color="transparent")
-                info_frame.pack(fill="x", padx=10, pady=(10, 2))
-
-                ctk.CTkLabel(
-                    info_frame, text=title,
-                    font=ctk.CTkFont(size=14, weight="bold"),
-                    anchor="w",
-                ).pack(side="left")
-
-                if username:
-                    ctk.CTkLabel(
-                        info_frame, text=username,
-                        font=ctk.CTkFont(size=11), text_color="#888888",
-                        anchor="w",
-                    ).pack(side="left", padx=(10, 0))
-
-                # Code + remaining
-                code_frame = ctk.CTkFrame(container, fg_color="transparent")
-                code_frame.pack(fill="x", padx=10, pady=5)
-
-                code_label = ctk.CTkLabel(
-                    code_frame, text="------",
-                    font=ctk.CTkFont(family="monospace", size=28, weight="bold"),
-                    text_color="#2ecc71",
-                    anchor="center",
-                )
-                code_label.pack(fill="x")
-
-                time_frame = ctk.CTkFrame(container, fg_color="transparent")
-                time_frame.pack(fill="x", padx=10, pady=(0, 10))
-
-                time_label = ctk.CTkLabel(
-                    time_frame, text="",
+                    info_frame, text=username,
                     font=ctk.CTkFont(size=11), text_color="#888888",
-                    anchor="w",
-                )
-                time_label.pack(side="left")
+                ).pack(side="left", padx=(10, 0))
 
-                # Progress bar (Canvas-based)
-                progress_canvas = ctk.CTkCanvas(
-                    time_frame, height=4, bg="#333333",
-                    highlightthickness=0,
-                )
-                progress_canvas.pack(side="right", fill="x", expand=True)
+            # Code display
+            code_label = ctk.CTkLabel(
+                container, text="------",
+                font=ctk.CTkFont(family="monospace", size=28, weight="bold"),
+                text_color="#2ecc71", anchor="center",
+            )
+            code_label.pack(fill="x", padx=10, pady=5)
 
-                def make_update(widgets, sec):
-                    def update():
-                        code, remaining = get_totp_code(secret)
-                        code_text = code or "------"
-                        color = "#2ecc71" if remaining > 10 else "#f39c12" if remaining > 5 else "#e74c3c"
-                        widgets["code"].configure(text=code_text, text_color=color)
-                        widgets["time"].configure(text=f"剩余 {remaining}s")
+            # Time/counter info
+            info_bar = ctk.CTkFrame(container, fg_color="transparent")
+            info_bar.pack(fill="x", padx=10, pady=(0, 10))
 
-                        # Update progress bar
-                        progress = remaining / 30
-                        w = int(progress * 120)
-                        widgets["canvas"].delete("bar")
-                        fill_color = color
-                        widgets["canvas"].create_rectangle(0, 0, w, 4, fill=fill_color, tags="bar")
+            time_label = ctk.CTkLabel(
+                info_bar, text="",
+                font=ctk.CTkFont(size=11), text_color="#888888",
+                anchor="w",
+            )
+            time_label.pack(side="left")
 
-                        totp_win.after(1000, update)
-                    return update
+            progress_canvas = ctk.CTkCanvas(
+                info_bar, height=4, bg="#333333",
+                highlightthickness=0,
+            )
+            progress_canvas.pack(side="right", fill="x", expand=True)
 
-                widgets = {"code": code_label, "time": time_label, "canvas": progress_canvas}
-                totp_widgets.append(widgets)
+            widgets = {
+                "code": code_label, "time": time_label,
+                "canvas": progress_canvas, "entry": entry,
+            }
+            widgets_list.append(widgets)
 
-                # Click to copy
-                def on_copy(clabel=code_label, sec=secret):
-                    c, _ = get_totp_code(sec)
+            # Click to copy
+            def on_copy(widgets=widgets):
+                e = widgets["entry"]
+                otp_t = e.get("otp_type", "")
+                otp_s = e.get("otp_secret", "").strip()
+                if otp_t == "totp":
+                    c, _ = get_totp_code(otp_s)
                     if c:
                         pyperclip.copy(c)
-                        clabel.configure(text="✓ 已复制", text_color="#3498db")
-                        totp_win.after(1500, lambda: on_copy_restore(clabel, sec))
-
-                def on_copy_restore(clabel, sec):
-                    c, _ = get_totp_code(sec)
+                        widgets["code"].configure(text="✓ 已复制", text_color="#3498db")
+                        win.after(1500, lambda: widgets["code"].configure(
+                            text=widgets["code"].cget("text")))
+                elif otp_t == "hotp":
+                    ctr = e.get("hotp_counter", 0)
+                    c, new_ctr = get_hotp_code(otp_s, ctr)
                     if c:
-                        clabel.configure(text=c)
-                    else:
-                        clabel.configure(text="------")
+                        pyperclip.copy(c)
+                        self.store.update_entry(e["id"], {"hotp_counter": new_ctr + 1})
+                        widgets["code"].configure(text="✓ 已复制", text_color="#3498db")
+                        win.after(1500, lambda: widgets["code"].configure(
+                            text=widgets["code"].cget("text")))
 
-                code_label.bind("<Button-1>", lambda evt, f=on_copy: f())
-                code_label.configure(cursor="hand2")
+            code_label.bind("<Button-1>", lambda evt, f=on_copy: f())
+            code_label.configure(cursor="hand2")
 
-        render_totp_items()
+        # Start refresh timers for TOTP entries
+        for w in widgets_list:
+            entry = w["entry"]
+            otp_type = entry.get("otp_type", "")
+            secret = entry.get("otp_secret", "").strip()
 
-        # Start refresh timers
-        for widgets in totp_widgets:
-            update_fn = None
-            # Trigger first render
-            code, remaining = get_totp_code(
-                [e for e in totp_entries if e.get("totp_secret", "").strip()][0]
-                if totp_entries else ""
-            )
+            def make_totp_refresh(widgets, sec):
+                def update():
+                    code, remaining = get_totp_code(sec)
+                    code_text = code or "------"
+                    color = "#2ecc71" if remaining > 10 else "#f39c12" if remaining > 5 else "#e74c3c"
+                    widgets["code"].configure(text=code_text, text_color=color)
+                    widgets["time"].configure(text=f"剩余 {remaining}s")
+                    progress = remaining / 30
+                    cw = max(2, int(progress * 120))
+                    widgets["canvas"].delete("bar")
+                    widgets["canvas"].create_rectangle(0, 0, cw, 4, fill=color, tags="bar")
+                    win.after(1000, update)
+                return update
 
-        # Simple approach: just trigger the first render cycle
-        # We use the after mechanism built into update closures
-        # Let me simplify
-        def start_refresh_for(widgets, secret):
-            def update():
-                code, remaining = get_totp_code(secret)
-                code_text = code or "------"
-                color = "#2ecc71" if remaining > 10 else "#f39c12" if remaining > 5 else "#e74c3c"
-                widgets["code"].configure(text=code_text, text_color=color)
-                widgets["time"].configure(text=f"剩余 {remaining}s")
-                progress = remaining / 30
-                w = max(2, int(progress * 120))
-                widgets["canvas"].delete("bar")
-                widgets["canvas"].create_rectangle(0, 0, w, 4, fill=color, tags="bar")
-                totp_win.after(1000, update)
-            update()
+            def make_hotp_refresh(widgets, sec, ctr):
+                def update():
+                    code, counter = get_hotp_code(sec, ctr)
+                    code_text = code or "------"
+                    widgets["code"].configure(text=code_text, text_color="#9b59b6")
+                    widgets["time"].configure(text=f"计数器: {counter}")
+                    widgets["canvas"].delete("bar")
+                return update
 
-        for i, entry in enumerate(totp_entries):
-            if i < len(totp_widgets):
-                start_refresh_for(totp_widgets[i], entry.get("totp_secret", "").strip())
+            if otp_type == "totp" and secret:
+                make_totp_refresh(w, secret)()
+            elif otp_type == "hotp" and secret:
+                make_hotp_refresh(w, secret, entry.get("hotp_counter", 0))()
 
-        ctk.CTkButton(totp_win, text="关闭", command=totp_win.destroy, width=100).pack(pady=10)
+        if not otp_entries:
+            ctk.CTkLabel(
+                scroll, text="暂无 OTP 验证码\n编辑账号并配置 OTP 即可添加",
+                font=ctk.CTkFont(size=14), text_color="#888888",
+            ).pack(pady=50)
+
+        ctk.CTkButton(win, text="关闭", command=win.destroy, width=100).pack(pady=10)
+
+    def _import_otp(self):
+        """Import OTP entries from otpauth:// URIs (one per line)."""
+        dialog = ctk.CTkToplevel(self.window)
+        dialog.title("导入 OTP")
+        dialog.geometry("500x400")
+        dialog.transient(self.window)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog, text="粘贴 otpauth:// URI（每行一个）",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        ).pack(pady=(15, 10))
+
+        ctk.CTkLabel(
+            dialog, text="支持 TOTP 和 HOTP 格式",
+            font=ctk.CTkFont(size=11), text_color="#888888",
+        ).pack(pady=(0, 10))
+
+        text_box = ctk.CTkTextbox(dialog, width=460, height=200)
+        text_box.pack(padx=15, pady=5)
+
+        def do_import():
+            text = text_box.get("1.0", "end-1c")
+            lines = [l.strip() for l in text.split("\n") if l.strip()]
+            imported = 0
+            for line in lines:
+                if not line.startswith("otpauth://"):
+                    continue
+                info = parse_otpauth_uri(line)
+                if not info.get("secret"):
+                    continue
+
+                # Check if entry with same title exists
+                existing = None
+                for e in self.entries:
+                    if e.get("title", "") == info.get("issuer", info.get("account", "")):
+                        existing = e
+                        break
+
+                otp_type = "totp" if info.get("type", "totp") == "totp" else "hotp"
+                data = {
+                    "otp_type": otp_type,
+                    "otp_secret": info["secret"],
+                }
+                if otp_type == "hotp":
+                    try:
+                        data["hotp_counter"] = int(info.get("counter", "0"))
+                    except ValueError:
+                        data["hotp_counter"] = 0
+
+                if existing:
+                    existing.update(data)
+                    self.store.update_entry(existing["id"], data)
+                else:
+                    data["title"] = info.get("issuer", info.get("account", "Imported"))
+                    data["username"] = info.get("account", "")
+                    data["category"] = "默认"
+                    self.store.add_entry(data)
+                imported += 1
+
+            self._load_entries()
+            dialog.destroy()
+
+        ctk.CTkButton(
+            dialog, text=f"导入 ({0} 个)", width=150, height=35,
+            command=do_import,
+        ).pack(pady=10)
+
+        ctk.CTkButton(dialog, text="取消", command=dialog.destroy, width=80).pack(pady=5)
+
+    def _export_otp(self):
+        """Export all OTP entries as otpauth:// URIs to clipboard."""
+        otp_entries = [e for e in self.entries if e.get("otp_type", "") in ("totp", "hotp")]
+        if not otp_entries:
+            return
+
+        lines = []
+        for entry in otp_entries:
+            otp_type = entry.get("otp_type", "")
+            secret = entry.get("otp_secret", "").strip()
+            if not secret:
+                continue
+            title = entry.get("title", "Unknown")
+            username = entry.get("username", "")
+            account = f"{title}: {username}" if username else title
+
+            if otp_type == "totp":
+                uri = get_totp_uri(secret, account, title)
+            else:
+                ctr = entry.get("hotp_counter", 0)
+                uri = get_hotp_uri(secret, account, title, ctr)
+            lines.append(uri)
+
+        pyperclip.copy("\n".join(lines))
 
     def _lock(self):
         self.window.destroy()
