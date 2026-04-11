@@ -3,6 +3,7 @@ import pyperclip
 import webbrowser
 import json
 import os
+from zxcvbn import zxcvbn
 from src.data_store import DataStore
 from src.generators import generate_password, generate_username
 from src.totp import (
@@ -169,6 +170,26 @@ class PasswordManagerApp:
             command=self._export_otp, width=180,
         )
         export_btn.pack(pady=5)
+
+        # Receive shared entry
+        recv_btn = ctk.CTkButton(
+            self.sidebar, text="📨 接收分享",
+            command=self._receive_share, width=180,
+        )
+        recv_btn.pack(pady=5)
+
+        # CSV Import/Export
+        csv_import_btn = ctk.CTkButton(
+            self.sidebar, text="📥 导入 CSV",
+            command=self._import_csv, width=180,
+        )
+        csv_import_btn.pack(pady=5)
+
+        csv_export_btn = ctk.CTkButton(
+            self.sidebar, text="📤 导出 CSV",
+            command=self._export_csv, width=180,
+        )
+        csv_export_btn.pack(pady=5)
 
         # Separator
         sep = ctk.CTkFrame(self.sidebar, height=2, fg_color="#444444")
@@ -435,6 +456,7 @@ class PasswordManagerApp:
         if otp_type in ("totp", "hotp"):
             actions.append(("复制OTP", lambda: (self._copy_otp(entry), menu.destroy())))
         actions.extend([
+            ("分享", lambda: (self._share_entry(entry), menu.destroy())),
             ("编辑", lambda: (self._show_edit_dialog(entry), menu.destroy())),
             ("删除", lambda: (self._delete_entry(entry), menu.destroy())),
         ])
@@ -522,6 +544,47 @@ class PasswordManagerApp:
                 )
                 copy_btn.pack(side="left", padx=2)
                 fields[key] = entry
+
+                # Strength bar row
+                row += 1
+                strength_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+                strength_frame.grid(row=row, column=1, padx=15, pady=(0, 5), sticky="w")
+                strength_canvas = ctk.CTkCanvas(
+                    strength_frame, width=300, height=6,
+                    bg="#333333", highlightthickness=0,
+                )
+                strength_canvas.pack(side="left")
+                strength_label = ctk.CTkLabel(
+                    strength_frame, text="",
+                    font=ctk.CTkFont(size=10), width=80,
+                    anchor="w",
+                )
+                strength_label.pack(side="left", padx=(8, 0))
+
+                STRENGTH_COLORS = ["#e74c3c", "#f39c12", "#f1c40f", "#27ae60"]
+                STRENGTH_LABELS = ["弱", "一般", "强", "极强"]
+
+                def update_strength(*_):
+                    pwd = entry.get()
+                    strength_canvas.delete("bar")
+                    if not pwd:
+                        strength_label.configure(text="")
+                        return
+                    try:
+                        result = zxcvbn(pwd)
+                        score = result["score"]  # 0-4
+                        idx = min(score, 3) if score > 0 else 0
+                        if score == 0:
+                            strength_canvas.create_rectangle(0, 0, 60, 6, fill="#555555", tags="bar")
+                            strength_label.configure(text="弱", text_color="#e74c3c")
+                        else:
+                            w = int((score / 4) * 300)
+                            strength_canvas.create_rectangle(0, 0, w, 6, fill=STRENGTH_COLORS[idx], tags="bar")
+                            strength_label.configure(text=STRENGTH_LABELS[idx], text_color=STRENGTH_COLORS[idx])
+                    except Exception:
+                        pass
+
+                entry.bind("<KeyRelease>", update_strength)
             elif key == "notes":
                 entry = ctk.CTkTextbox(dialog, width=300, height=60)
                 entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
@@ -713,6 +776,50 @@ class PasswordManagerApp:
                 )
                 copy_btn.pack(side="left", padx=2)
                 fields[key] = entry_w
+
+                # Strength bar row
+                row += 1
+                strength_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+                strength_frame.grid(row=row, column=1, padx=15, pady=(0, 5), sticky="w")
+                strength_canvas = ctk.CTkCanvas(
+                    strength_frame, width=300, height=6,
+                    bg="#333333", highlightthickness=0,
+                )
+                strength_canvas.pack(side="left")
+                strength_label = ctk.CTkLabel(
+                    strength_frame, text="",
+                    font=ctk.CTkFont(size=10), width=80,
+                    anchor="w",
+                )
+                strength_label.pack(side="left", padx=(8, 0))
+
+                STRENGTH_COLORS = ["#e74c3c", "#f39c12", "#f1c40f", "#27ae60"]
+                STRENGTH_LABELS = ["弱", "一般", "强", "极强"]
+
+                def update_strength_edit(*_):
+                    pwd = entry_w.get()
+                    strength_canvas.delete("bar")
+                    if not pwd:
+                        strength_label.configure(text="")
+                        return
+                    try:
+                        result = zxcvbn(pwd)
+                        score = result["score"]
+                        idx = min(score, 3) if score > 0 else 0
+                        if score == 0:
+                            strength_canvas.create_rectangle(0, 0, 60, 6, fill="#555555", tags="bar")
+                            strength_label.configure(text="弱", text_color="#e74c3c")
+                        else:
+                            w = int((score / 4) * 300)
+                            strength_canvas.create_rectangle(0, 0, w, 6, fill=STRENGTH_COLORS[idx], tags="bar")
+                            strength_label.configure(text=STRENGTH_LABELS[idx], text_color=STRENGTH_COLORS[idx])
+                    except Exception:
+                        pass
+
+                entry_w.bind("<KeyRelease>", update_strength_edit)
+                # Show initial strength
+                if default:
+                    update_strength_edit()
             elif key == "notes":
                 entry_w = ctk.CTkTextbox(dialog, width=300, height=60)
                 entry_w.insert("1.0", default)
@@ -1274,6 +1381,297 @@ class PasswordManagerApp:
             lines.append(uri)
 
         pyperclip.copy("\n".join(lines))
+
+    def _share_entry(self, entry):
+        """Share an entry: generate encrypted data + share code."""
+        import base64
+        import hashlib
+        import os
+        import string
+        import secrets
+        from cryptography.fernet import Fernet
+
+        dialog = ctk.CTkToplevel(self.window)
+        dialog.title("分享账号")
+        dialog.geometry("480x380")
+        dialog.transient(self.window)
+        dialog.grab_set()
+        dialog.attributes("-topmost", True)
+
+        ctk.CTkLabel(
+            dialog, text=f"分享: {entry.get('title', '')}",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(pady=(15, 10))
+
+        ctk.CTkLabel(
+            dialog, text="生成 6 位分享码和加密数据，对方输入即可获取",
+            font=ctk.CTkFont(size=11), text_color="#888888",
+        ).pack(pady=(0, 15))
+
+        # Generate share code
+        share_code = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+
+        # Encrypt the entry data with the share code as key
+        entry_data = json.dumps({
+            "title": entry.get("title", ""),
+            "username": entry.get("username", ""),
+            "password": entry.get("password", ""),
+            "url": entry.get("url", ""),
+            "notes": entry.get("notes", ""),
+            "otp_type": entry.get("otp_type", ""),
+            "otp_secret": entry.get("otp_secret", ""),
+            "hotp_counter": entry.get("hotp_counter", 0),
+        }, ensure_ascii=False)
+
+        # Derive key from share code
+        key = base64.urlsafe_b64encode(
+            hashlib.sha256(share_code.encode()).digest()
+        )
+        fernet = Fernet(key)
+        encrypted = fernet.encrypt(entry_data.encode())
+        encrypted_b64 = base64.b64encode(encrypted).decode()
+
+        # Display share code
+        code_frame = ctk.CTkFrame(dialog, fg_color="#1a1a2e", corner_radius=10)
+        code_frame.pack(padx=20, fill="x")
+
+        ctk.CTkLabel(
+            code_frame, text="分享码",
+            font=ctk.CTkFont(size=12), text_color="#888888",
+        ).pack(pady=(10, 5))
+
+        code_label = ctk.CTkLabel(
+            code_frame, text=share_code,
+            font=ctk.CTkFont(family="monospace", size=28, weight="bold"),
+            text_color="#f1c40f",
+        )
+        code_label.pack(pady=(0, 10))
+
+        def copy_code():
+            pyperclip.copy(share_code)
+            code_label.configure(text="✓ 已复制")
+            dialog.after(1500, lambda: code_label.configure(text=share_code))
+
+        ctk.CTkButton(
+            dialog, text="复制分享码", command=copy_code, width=150,
+        ).pack(pady=10)
+
+        # Display encrypted data
+        ctk.CTkLabel(
+            dialog, text="加密数据（同时发给对方）",
+            font=ctk.CTkFont(size=11), text_color="#888888",
+        ).pack()
+
+        enc_text = ctk.CTkTextbox(dialog, width=420, height=60)
+        enc_text.insert("1.0", encrypted_b64)
+        enc_text.configure(state="disabled")
+        enc_text.pack(padx=15, pady=5)
+
+        def copy_all():
+            pyperclip.copy(f"分享码: {share_code}\n加密数据: {encrypted_b64}")
+
+        ctk.CTkButton(
+            dialog, text="复制全部信息", command=copy_all, width=150,
+        ).pack(pady=10)
+
+        ctk.CTkButton(
+            dialog, text="关闭", command=dialog.destroy, width=80,
+        ).pack(pady=5)
+
+    def _receive_share(self):
+        """Receive shared entry using share code + encrypted data."""
+        import base64
+        import hashlib
+        from cryptography.fernet import Fernet
+
+        dialog = ctk.CTkToplevel(self.window)
+        dialog.title("接收分享")
+        dialog.geometry("480x400")
+        dialog.transient(self.window)
+        dialog.grab_set()
+        dialog.attributes("-topmost", True)
+
+        ctk.CTkLabel(
+            dialog, text="接收分享的账号",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(pady=(15, 10))
+
+        # Share code entry
+        ctk.CTkLabel(
+            dialog, text="分享码", font=ctk.CTkFont(size=12),
+        ).pack()
+        code_var = ctk.StringVar()
+        code_entry = ctk.CTkEntry(
+            dialog, textvariable=code_var, width=200, height=35,
+            font=ctk.CTkFont(size=14),
+        )
+        code_entry.pack(pady=5)
+
+        # Encrypted data entry
+        ctk.CTkLabel(
+            dialog, text="加密数据", font=ctk.CTkFont(size=12),
+        ).pack()
+        data_text = ctk.CTkTextbox(dialog, width=420, height=80)
+        data_text.pack(padx=15, pady=5)
+
+        status_var = ctk.StringVar(value="")
+        status_lbl = ctk.CTkLabel(
+            dialog, textvariable=status_var,
+            text_color="#e74c3c", font=ctk.CTkFont(size=12),
+        )
+        status_lbl.pack(pady=5)
+
+        def do_import():
+            share_code = code_var.get().strip().upper()
+            encrypted_b64 = data_text.get("1.0", "end-1c").strip()
+
+            if not share_code or not encrypted_b64:
+                status_var.set("请填写完整信息")
+                return
+
+            try:
+                key = base64.urlsafe_b64encode(
+                    hashlib.sha256(share_code.encode()).digest()
+                )
+                fernet = Fernet(key)
+                encrypted = base64.b64decode(encrypted_b64)
+                decrypted = fernet.decrypt(encrypted).decode()
+                data = json.loads(decrypted)
+
+                # Add to store
+                data["category"] = "默认"
+                self.store.add_entry(data)
+                self._load_entries()
+                status_var.set("✓ 导入成功！")
+                dialog.after(1000, dialog.destroy)
+            except Exception as e:
+                status_var.set("分享码或加密数据错误")
+
+        ctk.CTkButton(
+            dialog, text="导入", command=do_import, width=150, height=35,
+        ).pack(pady=10)
+
+        ctk.CTkButton(
+            dialog, text="取消", command=dialog.destroy, width=80,
+        ).pack(pady=5)
+
+    def _import_csv(self):
+        """Import entries from 1Password / LastPass CSV format."""
+        import csv
+        import io
+
+        dialog = ctk.CTkToplevel(self.window)
+        dialog.title("导入 CSV")
+        dialog.geometry("520x450")
+        dialog.transient(self.window)
+        dialog.grab_set()
+        dialog.attributes("-topmost", True)
+
+        ctk.CTkLabel(
+            dialog, text="导入 1Password / LastPass CSV",
+            font=ctk.CTkFont(size=16, weight="bold"),
+        ).pack(pady=(15, 10))
+
+        # Format selector
+        fmt_var = ctk.StringVar(value="1Password")
+        fmt_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        fmt_frame.pack(pady=5)
+        for fmt in ["1Password", "LastPass", "Bitwarden"]:
+            ctk.CTkRadioButton(fmt_frame, text=fmt, variable=fmt_var, value=fmt).pack(side="left", padx=10)
+
+        ctk.CTkLabel(
+            dialog, text="粘贴 CSV 内容（含表头行）",
+            font=ctk.CTkFont(size=11), text_color="#888888",
+        ).pack(pady=(10, 5))
+
+        csv_text = ctk.CTkTextbox(dialog, width=480, height=200)
+        csv_text.pack(padx=15, pady=5)
+
+        status_var = ctk.StringVar(value="")
+        status_lbl = ctk.CTkLabel(
+            dialog, textvariable=status_var,
+            font=ctk.CTkFont(size=12),
+        )
+        status_lbl.pack(pady=5)
+
+        def do_import():
+            raw = csv_text.get("1.0", "end-1c").strip()
+            if not raw:
+                status_var.set("请粘贴 CSV 内容")
+                status_var.configure(text_color="#e74c3c")
+                return
+
+            fmt = fmt_var.get()
+            reader = csv.DictReader(io.StringIO(raw))
+            imported = 0
+            for csv_row in reader:
+                entry = {}
+                try:
+                    if fmt == "1Password":
+                        entry["title"] = csv_row.get("title", "") or csv_row.get("name", "")
+                        entry["username"] = csv_row.get("username", "")
+                        entry["password"] = csv_row.get("password", "")
+                        entry["url"] = csv_row.get("urls", "") or csv_row.get("website", "")
+                        entry["notes"] = csv_row.get("notes", "")
+                        entry["category"] = csv_row.get("type", "默认")
+                    elif fmt == "LastPass":
+                        entry["url"] = csv_row.get("url", "")
+                        entry["username"] = csv_row.get("username", "")
+                        entry["password"] = csv_row.get("password", "")
+                        entry["title"] = csv_row.get("name", "")
+                        entry["notes"] = csv_row.get("extra", "")
+                        entry["category"] = csv_row.get("grouping", "默认")
+                    elif fmt == "Bitwarden":
+                        entry["title"] = csv_row.get("name", "")
+                        entry["username"] = csv_row.get("login_uri", "")
+                        entry["password"] = csv_row.get("login_password", "")
+                        entry["url"] = csv_row.get("login_uri", "")
+                        entry["notes"] = csv_row.get("notes", "")
+                        entry["category"] = csv_row.get("type", "默认")
+
+                    # Clean up empty fields
+                    entry = {k: v for k, v in entry.items() if v}
+                    entry.setdefault("category", "默认")
+
+                    if entry.get("title") or entry.get("username"):
+                        self.store.add_entry(entry)
+                        imported += 1
+                except Exception:
+                    continue
+
+            self._load_entries()
+            status_var.set(f"✓ 成功导入 {imported} 条记录")
+            status_var.configure(text_color="#2ecc71")
+            dialog.after(1500, dialog.destroy)
+
+        ctk.CTkButton(
+            dialog, text="导入", command=do_import, width=150, height=35,
+        ).pack(pady=10)
+
+        ctk.CTkButton(
+            dialog, text="取消", command=dialog.destroy, width=80,
+        ).pack(pady=5)
+
+    def _export_csv(self):
+        """Export entries to 1Password compatible CSV format."""
+        import csv
+        import io
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Title", "Username", "Password", "URL", "Notes", "Category"])
+
+        for entry in self.entries:
+            writer.writerow([
+                entry.get("title", ""),
+                entry.get("username", ""),
+                entry.get("password", ""),
+                entry.get("url", ""),
+                entry.get("notes", ""),
+                entry.get("category", ""),
+            ])
+
+        pyperclip.copy(output.getvalue())
 
     def _lock(self):
         self.window.destroy()
