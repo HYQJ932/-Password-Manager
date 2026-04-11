@@ -516,46 +516,37 @@ class PasswordManagerApp:
                     command=lambda e=entry: e.delete(0, "end") or e.insert(0, generate_password()),
                 )
                 gen_btn.pack(side="left", padx=2)
-                fields[key] = entry
-            elif key == "totp_secret":
-                frame = ctk.CTkFrame(dialog, fg_color="transparent")
-                frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
-                entry = ctk.CTkEntry(frame, width=220)
-                entry.pack(side="left")
-                gen_totp_btn = ctk.CTkButton(
-                    frame, text="生成", width=50,
-                    command=lambda e=entry: e.delete(0, "end") or e.insert(0, generate_totp_secret()),
+                copy_btn = ctk.CTkButton(
+                    frame, text="📋", width=30,
+                    command=lambda e=entry: pyperclip.copy(e.get()),
                 )
-                gen_totp_btn.pack(side="left", padx=2)
-
-                def _parse_uri():
-                    from tkinter import simpledialog
-                    uri = simpledialog.askstring("从 URI 解析", "粘贴 otpauth:// URI:")
-                    if uri:
-                        info = parse_otpauth_uri(uri)
-                        if info.get("secret"):
-                            entry.delete(0, "end")
-                            entry.insert(0, info["secret"])
-
-                parse_btn = ctk.CTkButton(
-                    frame, text="URI", width=50,
-                    command=_parse_uri,
-                )
-                parse_btn.pack(side="left", padx=2)
+                copy_btn.pack(side="left", padx=2)
                 fields[key] = entry
             elif key == "notes":
                 entry = ctk.CTkTextbox(dialog, width=300, height=60)
                 entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                copy_btn = ctk.CTkButton(
+                    dialog, text="📋", width=30,
+                    command=lambda e=entry: pyperclip.copy(e.get("1.0", "end-1c")),
+                )
+                copy_btn.grid(row=row, column=2, padx=5, pady=8)
                 fields[key] = entry
             else:
-                entry = ctk.CTkEntry(dialog, width=300)
-                entry.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                frame = ctk.CTkFrame(dialog, fg_color="transparent")
+                frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                entry = ctk.CTkEntry(frame, width=270)
+                entry.pack(side="left")
+                copy_btn = ctk.CTkButton(
+                    frame, text="📋", width=30,
+                    command=lambda e=entry: pyperclip.copy(e.get()),
+                )
+                copy_btn.pack(side="left", padx=2)
                 if key == "username":
                     gen_user_btn = ctk.CTkButton(
-                        dialog, text="生成用户名", width=70,
+                        frame, text="生成", width=50,
                         command=lambda e=entry: e.delete(0, "end") or e.insert(0, generate_username()),
                     )
-                    gen_user_btn.grid(row=row, column=2, padx=5, pady=8)
+                    gen_user_btn.pack(side="left", padx=2)
                 fields[key] = entry
 
             row += 1
@@ -716,22 +707,39 @@ class PasswordManagerApp:
                     command=lambda e=entry_w: e.delete(0, "end") or e.insert(0, generate_password()),
                 )
                 gen_btn.pack(side="left", padx=2)
+                copy_btn = ctk.CTkButton(
+                    frame, text="📋", width=30,
+                    command=lambda e=entry_w: pyperclip.copy(e.get()),
+                )
+                copy_btn.pack(side="left", padx=2)
                 fields[key] = entry_w
             elif key == "notes":
                 entry_w = ctk.CTkTextbox(dialog, width=300, height=60)
                 entry_w.insert("1.0", default)
                 entry_w.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                copy_btn = ctk.CTkButton(
+                    dialog, text="📋", width=30,
+                    command=lambda e=entry_w: pyperclip.copy(e.get("1.0", "end-1c")),
+                )
+                copy_btn.grid(row=row, column=2, padx=5, pady=8)
                 fields[key] = entry_w
             else:
-                entry_w = ctk.CTkEntry(dialog, width=300)
+                frame = ctk.CTkFrame(dialog, fg_color="transparent")
+                frame.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                entry_w = ctk.CTkEntry(frame, width=270)
                 entry_w.insert(0, default)
-                entry_w.grid(row=row, column=1, padx=15, pady=8, sticky="w")
+                entry_w.pack(side="left")
+                copy_btn = ctk.CTkButton(
+                    frame, text="📋", width=30,
+                    command=lambda e=entry_w: pyperclip.copy(e.get()),
+                )
+                copy_btn.pack(side="left", padx=2)
                 if key == "username":
                     gen_user_btn = ctk.CTkButton(
-                        dialog, text="生成用户名", width=70,
+                        frame, text="生成", width=50,
                         command=lambda e=entry_w: e.delete(0, "end") or e.insert(0, generate_username()),
                     )
-                    gen_user_btn.grid(row=row, column=2, padx=5, pady=8)
+                    gen_user_btn.pack(side="left", padx=2)
                 fields[key] = entry_w
 
             row += 1
