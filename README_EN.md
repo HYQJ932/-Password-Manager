@@ -36,6 +36,43 @@ All data is encrypted and stored locally. No cloud, no tracking, no telemetry.
 
 ---
 
+## Roadmap
+
+> The following features are planned and will be implemented gradually. All remain fully offline and local-only.
+
+### Security Enhancements
+- **Master password change** — Full re-encryption within transaction, rollback on failure
+- **Windows Hello quick unlock** — Biometric convenience login
+- **Shamir secret sharing backup** — QR code shares for print storage, ≥M shares to recover
+- **Read-only / viewer password** — Independent password, view-only access
+- **Local audit log** — Encrypted operation records, query/clear/export
+
+### Data Management
+- **Password history** — Auto-save last 5 password changes, one-click restore
+- **Automatic backup** — Post-write backup with configurable retention policy
+- **Attachment support** — Encrypted file attachments (recovery codes, certs, SSH keys, etc.)
+- **Scheduled encrypted snapshots** — Daily/weekly encrypted JSON export to local path
+- **Multi-vault** — Independent databases with separate master passwords (personal/work)
+
+### Experience Improvements
+- **System tray** — Background常驻, right-click menu for quick actions
+- **Global hotkeys** — Ctrl+Shift+L to lock, Ctrl+Shift+Space for quick search
+- **Command palette (Ctrl+K)** — Fuzzy search + quick commands
+- **Recently used sorting** — Smart sort by last access time
+- **AMOLED pure black theme** — Power saving and eye-friendly
+- **Virtual scrolling** — Smooth scrolling with thousands of entries
+- **Nested folders + tags** — Infinite tree hierarchy + many-to-many tag filtering
+
+### Entry Types
+- **SSH Key type** — Public/private key and passphrase management
+- **Secure Note type** — Pure encrypted long-text storage
+
+### Toolchain
+- **CLI version** — Command-line tool for scripting and operations
+- **Portable mode** — USB-ready, all data stored alongside the executable
+
+---
+
 ## Sponsor
 
 If you find this tool helpful, consider sponsoring to support continued development ❤️
