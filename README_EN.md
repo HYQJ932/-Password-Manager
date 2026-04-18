@@ -36,6 +36,16 @@ All data is encrypted and stored locally. No cloud, no tracking, no telemetry.
 
 ---
 
+## Sponsor
+
+If you find this tool helpful, consider sponsoring to support continued development ❤️
+
+Alipay is recommended, credit card / Huabei supported:
+
+![Alipay QR Code](donate.jpg)
+
+---
+
 ## License
 
 **Proprietary — Source Available**
