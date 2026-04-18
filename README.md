@@ -1,48 +1,48 @@
-# Password Manager
+# 密码管理器
 
-> [**English**](README.md) · [**中文**](README_CN.md)
+> [**中文**](README.md) · [**English**](README_EN.md)
 
-A local-first, secure desktop password manager built with **Tauri 2 + React + Rust**.
+一款本地优先的安全桌面密码管理器，基于 **Tauri 2 + React + Rust** 构建。
 
-All data is encrypted and stored locally. No cloud, no tracking, no telemetry.
-
----
-
-## Features
-
-- **AES-256-GCM encryption** with Argon2id key derivation
-- **Master password** protection with Argon2 hash verification
-- **Two entry types**: Login (username + password + URL) and API Key
-- **Full CRUD** operations for vault entries
-- **Password generator** with configurable length, character sets, and ambiguity exclusion
-- **Username generator** with multiple formats (word1234, word_word, word.word)
-- **Folder organization** and favorites
-- **Search** across all entries (name, username, URL, API key)
-- **Auto-lock** with configurable timeout (1/5/15/30 min or never)
-- **Dark / Light mode** with CSS custom properties
-- **i18n**: English & 简体中文
-- **One-click copy** to clipboard
-- **Apple HIG-inspired** UI design
+所有数据加密后仅存储在本地，无云端、无追踪、无遥测。
 
 ---
 
-## Security
+## 功能特性
 
-1. Master password is hashed with Argon2 and stored for verification only
-2. Encryption key is derived via Argon2id with a random 32-byte salt
-3. All sensitive data is encrypted with AES-256-GCM before storage
-4. On lock, the encryption key is zeroized from memory
-5. No network access — the app is fully offline
+- **AES-256-GCM 加密** + Argon2id 密钥派生
+- **主密码保护** + Argon2 哈希验证
+- **两种条目类型**：登录凭据（用户名 + 密码 + URL）和 API 密钥
+- **完整增删改查** 操作
+- **密码生成器**：可配置长度、字符集、排除歧义字符
+- **用户名生成器**：多种格式（word1234 / word_word / word.word）
+- **文件夹分类** 与收藏功能
+- **全局搜索**：按名称/用户名/URL/API Key 搜索
+- **自动锁定**：可配置超时时间（1/5/15/30 分钟或永不）
+- **深色 / 浅色主题** 切换
+- **中英双语** 界面
+- **一键复制** 到剪贴板
+- **Apple HIG 风格** 界面设计
 
 ---
 
-## License
+## 安全机制
 
-**Proprietary — Source Available**
+1. 主密码仅存储 Argon2 哈希值，用于验证
+2. 加密密钥通过 Argon2id + 随机 32 字节盐值派生
+3. 所有敏感数据以 AES-256-GCM 加密后存储
+4. 锁定时密钥从内存中安全清除
+5. 完全离线运行，无网络访问
+
+---
+
+## 许可证
+
+**专有软件 — 源码可见**
 
 Copyright (c) 2026 [HYQJ932](https://github.com/HYQJ932). All rights reserved.
 
-- Personal and educational use: **Free**
-- Commercial use: **Requires a paid license**
+- 个人和学习用途：**免费**
+- 商业用途：**需购买授权**
 
-See [LICENSE](./LICENSE) for full terms.
+详见 [LICENSE](./LICENSE)。
