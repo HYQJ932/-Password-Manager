@@ -28,12 +28,11 @@
 
 ## 使用说明
 
-### 安装
+### 获取与运行
 
-1. 从 [Releases](https://github.com/HYQJ932/password-manager/releases) 页面下载最新安装包
-   - Windows: `.exe` 或 `.msi` 安装程序
-   - macOS: `.dmg` 镜像文件
-2. 运行安装程序，按提示完成安装
+1. 从 [Releases](https://github.com/HYQJ932/-Password-Manager/releases) 页面下载最新版本
+2. 下载后解压（如有压缩包），双击 `Password Manager.exe` 直接运行
+3. 首次运行会自动初始化，无需安装
 
 ### 首次使用
 
