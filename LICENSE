@@ -1,79 +1,119 @@
-HYQJ932 Proprietary License v1.0
+# HYQJ932 专有许可证 v1.0
+
+Copyright (c) 2026 HYQJ932。保留所有权利。
+
+## 条款与条件
+
+### 1. 定义
+
+"软件"指本仓库中的密码管理器应用程序，包括所有源代码、文档和相关文件。
+
+"作者"指 HYQJ932，本软件的版权所有者。
+
+"商业使用"指任何旨在获取商业优势或金钱补偿的软件使用行为，包括但不限于：
+- (a) 在商业产品或服务中使用本软件；
+- (b) 出售、转授权或分发本软件以获取费用；
+- (c) 在营利性组织内部使用本软件；
+- (d) 将本软件作为托管或管理服务提供。
+
+### 2. 授权范围
+
+在遵守本许可证条款的前提下，作者授予您有限的、非独占的、不可转让的、可撤销的权利：
+
+- (a) 仅为个人、教育或评估目的查看、研究和分叉源代码；
+- (b) 仅为个人非商业使用修改本软件；
+- (c) 仅为个人非商业使用构建和运行本软件。
+
+### 3. 限制
+
+未经作者事先书面许可并购买商业许可证，您不得：
+
+- (a) 将本软件或任何衍生作品用于任何商业使用；
+- (b) 向第三方分发、转授权、出售或提供本软件或衍生作品用于商业使用；
+- (c) 移除或更改本软件中包含的任何版权声明、许可证文件或归属信息；
+- (d) 声称拥有本软件的所有权或歪曲其来源。
+
+### 4. 商业许可
+
+如需获取商业许可证，请通过以下方式联系作者：
+
+GitHub: https://github.com/HYQJ932
+
+商业许可证条款和价格根据具体情况确定。
+
+### 5. 贡献
+
+通过提交 Pull Request 或任何其他贡献，您同意授予作者永久的、全球范围内的、非独占的、免版税的、不可撤销的许可，以作者认为合适的任何许可使用、修改、分发和转授权您的贡献作为本软件的一部分。
+
+### 6. 免责声明
+
+本软件按"原样"提供，不提供任何形式的明示或暗示保证，包括但不限于适销性、特定用途适用性和不侵权的保证。在任何情况下，作者均不对因使用本软件而产生的任何索赔、损害或其他责任负责。
+
+### 7. 终止
+
+本许可证在终止前有效。如果您未能遵守任何条款，您在本许可证下的权利将自动终止，恕不另行通知。终止后，您必须销毁您拥有的本软件的所有副本。
+
+### 8. 适用法律
+
+本许可证受中华人民共和国法律管辖并按其解释。
+
+---
+
+# HYQJ932 Proprietary License v1.0
 
 Copyright (c) 2026 HYQJ932. All rights reserved.
 
-TERMS AND CONDITIONS
+## Terms and Conditions
 
-1. DEFINITIONS
+### 1. Definitions
 
-   "Software" refers to the Password Manager application, including all source
-   code, documentation, and associated files in this repository.
+"Software" refers to the Password Manager application, including all source code, documentation, and associated files in this repository.
 
-   "Author" refers to HYQJ932, the copyright holder of this Software.
+"Author" refers to HYQJ932, the copyright holder of this Software.
 
-   "Commercial Use" means any use of the Software that is intended for or
-   directed toward commercial advantage or monetary compensation. This includes,
-   but is not limited to:
-   (a) Using the Software in a commercial product or service;
-   (b) Selling, sublicensing, or distributing the Software for a fee;
-   (c) Using the Software internally within a for-profit organization;
-   (d) Offering the Software as a hosted or managed service.
+"Commercial Use" means any use of the Software that is intended for or directed toward commercial advantage or monetary compensation. This includes, but is not limited to:
+- (a) Using the Software in a commercial product or service;
+- (b) Selling, sublicensing, or distributing the Software for a fee;
+- (c) Using the Software internally within a for-profit organization;
+- (d) Offering the Software as a hosted or managed service.
 
-2. GRANT OF RIGHTS
+### 2. Grant of Rights
 
-   Subject to the terms of this License, the Author grants you a limited,
-   non-exclusive, non-transferable, revocable right to:
+Subject to the terms of this License, the Author grants you a limited, non-exclusive, non-transferable, revocable right to:
 
-   (a) View, study, and fork the source code for personal, educational, or
-       evaluation purposes only;
-   (b) Modify the Software for personal, non-commercial use only;
-   (c) Build and run the Software for personal, non-commercial use only.
+- (a) View, study, and fork the source code for personal, educational, or evaluation purposes only;
+- (b) Modify the Software for personal, non-commercial use only;
+- (c) Build and run the Software for personal, non-commercial use only.
 
-3. RESTRICTIONS
+### 3. Restrictions
 
-   You may NOT, without prior written permission and a paid commercial license
-   from the Author:
+You may NOT, without prior written permission and a paid commercial license from the Author:
 
-   (a) Use the Software or any derivative work for any Commercial Use;
-   (b) Distribute, sublicense, sell, or otherwise make available the Software
-       or any derivative work to third parties for Commercial Use;
-   (c) Remove or alter any copyright notices, license files, or attribution
-       contained in the Software;
-   (d) Claim ownership of the Software or misrepresent its origin.
+- (a) Use the Software or any derivative work for any Commercial Use;
+- (b) Distribute, sublicense, sell, or otherwise make available the Software or any derivative work to third parties for Commercial Use;
+- (c) Remove or alter any copyright notices, license files, or attribution contained in the Software;
+- (d) Claim ownership of the Software or misrepresent its origin.
 
-4. COMMERCIAL LICENSING
+### 4. Commercial Licensing
 
-   To obtain a commercial license, contact the Author at:
+To obtain a commercial license, contact the Author at:
 
-   GitHub: https://github.com/HYQJ932
+GitHub: https://github.com/HYQJ932
 
-   Commercial license terms and pricing are determined on a case-by-case basis.
+Commercial license terms and pricing are determined on a case-by-case basis.
 
-5. CONTRIBUTIONS
+### 5. Contributions
 
-   By submitting a pull request or any other contribution to this repository,
-   you agree to grant the Author a perpetual, worldwide, non-exclusive,
-   royalty-free, irrevocable license to use, modify, distribute, and sublicense
-   your contribution as part of the Software under any license the Author sees
-   fit.
+By submitting a pull request or any other contribution to this repository, you agree to grant the Author a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, modify, distribute, and sublicense your contribution as part of the Software under any license the Author sees fit.
 
-6. NO WARRANTY
+### 6. No Warranty
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-7. TERMINATION
+### 7. Termination
 
-   This License is effective until terminated. Your rights under this License
-   will terminate automatically without notice if you fail to comply with any
-   of its terms. Upon termination, you must destroy all copies of the Software
-   in your possession.
+This License is effective until terminated. Your rights under this License will terminate automatically without notice if you fail to comply with any of its terms. Upon termination, you must destroy all copies of the Software in your possession.
 
-8. GOVERNING LAW
+### 8. Governing Law
 
-   This License shall be governed by and construed in accordance with the laws
-   of the People's Republic of China.
+This License shall be governed by and construed in accordance with the laws of the People's Republic of China.
