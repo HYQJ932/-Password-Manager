@@ -28,6 +28,5 @@ src-tauri/gen/
 # Rust
 *.pdb
 
-# Lock files (optional, uncomment if you want to exclude)
-# package-lock.json
-# Cargo.lock
+# Release exe（通过 GitHub Releases 分发，不入仓库）
+/password-manager.exe

@@ -1,95 +1,76 @@
-# Password Manager
+# Password Manager 3.1
 
-> [**中文**](README.md) · [**English**](README_EN.md)
+A secure, lightweight desktop password management application built with Tauri + React + Rust.
 
-A local-first, secure desktop password manager built with **Tauri 2 + React + Rust**.
+## Versions
 
-All data is encrypted and stored locally. No cloud, no tracking, no telemetry.
-
----
+| Version | Description |
+|---------|-------------|
+| **Local** | Pure local storage, data saved in local SQLite database, no network required |
+| **GitHub** | Supports data sync via GitHub, suitable for multi-device usage |
 
 ## Features
 
-- **AES-256-GCM encryption** with Argon2id key derivation
-- **Master password** protection with Argon2 hash verification
-- **Two entry types**: Login (username + password + URL) and API Key
-- **Full CRUD** operations for vault entries
-- **Password generator** with configurable length, character sets, and ambiguity exclusion
-- **Username generator** with multiple formats (word1234, word_word, word.word)
-- **Folder organization** and favorites
-- **Search** across all entries (name, username, URL, API key)
-- **Auto-lock** with configurable timeout (1/5/15/30 min or never)
-- **Dark / Light mode** with CSS custom properties
-- **i18n**: English & 简体中文
-- **One-click copy** to clipboard
-- **Apple HIG-inspired** UI design
+- 🔐 **Master Password Protection** - Argon2id key derivation + AES-256-GCM encryption
+- 📁 **Folder Management** - Multi-level nested folder classification
+- 🔍 **Smart Search** - Quick search by name, username, URL, API Key
+- 🎲 **Password Generator** - Configurable length, character types, exclude ambiguous characters
+- 👤 **Username Generator** - Generate random usernames
+- 🌙 **Dark Mode** - One-click toggle between light and dark themes
+- 🌐 **Multi-language** - Supports Chinese/English interface
+- ⏱️ **Auto-Lock** - Configurable idle auto-lock time
+- ⭐ **Favorites** - Quick access to important entries
 
----
+## Security Features
 
-## Security
+- ✅ AES-256-GCM authenticated encryption
+- ✅ Argon2id key derivation (brute-force resistant)
+- ✅ Separate hash/encryption salts (rainbow table attack resistant)
+- ✅ Automatic memory key zeroization (memory dump attack resistant)
+- ✅ Database transactions ensure operation atomicity
+- ✅ Sensitive error messages are not leaked
 
-1. Master password is hashed with Argon2 and stored for verification only
-2. Encryption key is derived via Argon2id with a random 32-byte salt
-3. All sensitive data is encrypted with AES-256-GCM before storage
-4. On lock, the encryption key is zeroized from memory
-5. No network access — the app is fully offline
+## Quick Start
 
----
+### Direct Usage
 
-## Roadmap
+Double-click `password-manager.exe` to run.
 
-> The following features are planned and will be implemented gradually. All remain fully offline and local-only.
+On first launch, you need to set a master password. Please keep it safe, **data cannot be recovered if lost**.
 
-### Security Enhancements
-- **Master password change** — Full re-encryption within transaction, rollback on failure
-- **Windows Hello quick unlock** — Biometric convenience login
-- **Shamir secret sharing backup** — QR code shares for print storage, ≥M shares to recover
-- **Read-only / viewer password** — Independent password, view-only access
-- **Local audit log** — Encrypted operation records, query/clear/export
+### Build from Source
 
-### Data Management
-- **Password history** — Auto-save last 5 password changes, one-click restore
-- **Automatic backup** — Post-write backup with configurable retention policy
-- **Attachment support** — Encrypted file attachments (recovery codes, certs, SSH keys, etc.)
-- **Scheduled encrypted snapshots** — Daily/weekly encrypted JSON export to local path
-- **Multi-vault** — Independent databases with separate master passwords (personal/work)
+```bash
+# Install dependencies
+npm install
 
-### Experience Improvements
-- **System tray** — Background常驻, right-click menu for quick actions
-- **Global hotkeys** — Ctrl+Shift+L to lock, Ctrl+Shift+Space for quick search
-- **Command palette (Ctrl+K)** — Fuzzy search + quick commands
-- **Recently used sorting** — Smart sort by last access time
-- **AMOLED pure black theme** — Power saving and eye-friendly
-- **Virtual scrolling** — Smooth scrolling with thousands of entries
-- **Nested folders + tags** — Infinite tree hierarchy + many-to-many tag filtering
+# Development mode
+npm run tauri dev
 
-### Entry Types
-- **SSH Key type** — Public/private key and passphrase management
-- **Secure Note type** — Pure encrypted long-text storage
+# Build release version
+npm run tauri build
+```
 
-### Toolchain
-- **CLI version** — Command-line tool for scripting and operations
-- **Portable mode** — USB-ready, all data stored alongside the executable
+Build artifacts are located in `src-tauri/target/release/` directory.
 
----
+## Tech Stack
 
-## Sponsor
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Rust + Tauri 2
+- **Database**: SQLite (rusqlite)
+- **Encryption**: AES-256-GCM + Argon2id
 
-If you find this tool helpful, consider sponsoring to support continued development ❤️
+## Database Structure
 
-Alipay is recommended, credit card / Huabei supported:
+- `vault_entries` - Encrypted password entries
+- `folders` - Folder categories (supports nesting)
+- `settings` - Application settings
+- `auth` - Authentication info (password hash + salts)
 
-![Alipay QR Code](donate.jpg)
+## Database Migration
 
----
+The first time you run the new version, the old database will be automatically migrated. If you encounter issues, you can delete `%APPDATA%\com.password-manager.app\vault.db` to recreate it (**data will be lost**).
 
 ## License
 
-**Proprietary — Source Available**
-
-Copyright (c) 2026 [HYQJ932](https://github.com/HYQJ932). All rights reserved.
-
-- Personal and educational use: **Free**
-- Commercial use: **Requires a paid license**
-
-See [LICENSE](./LICENSE) for full terms.
+MIT

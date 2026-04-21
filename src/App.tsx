@@ -23,6 +23,7 @@ export default function App() {
   const [lang, setLangState] = useState<Lang>("zh");
 
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     vault.checkInitialized().catch((e) => {
@@ -40,7 +41,7 @@ export default function App() {
 
   // Auto-lock timer
   useEffect(() => {
-    if (vault.locked || vault.settings.autoLockMinutes === 0) return;
+    if (vault.locked) return;
 
     const resetTimer = () => {
       if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
@@ -63,6 +64,11 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle("dark", vault.settings.darkMode);
   }, [vault.settings.darkMode]);
+
+  // 同步 HTML lang 属性（辅助可访问性 / 字体渲染）
+  useEffect(() => {
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  }, [lang]);
 
   const handleSearch = useCallback(
     async (q: string) => {
@@ -95,43 +101,105 @@ export default function App() {
     setSelectedEntry(null);
   };
 
-  const handleSetLang = useCallback((l: Lang) => {
+  const handleSetLang = useCallback(async (l: Lang) => {
     setLangState(l);
-  }, []);
+    if (!vault.locked) {
+      try {
+        await vault.saveSettings({ ...vault.settings, language: l });
+      } catch {
+        // 错误已由 useVault 记录到 lastError，此处静默
+      }
+    }
+  }, [vault.locked, vault.settings, vault.saveSettings]);
 
   const t = useCallback(
-    (key: keyof typeof translations.en): string => {
-      return translations[lang]?.[key] ?? translations.en[key] ?? key;
+    (key: string): string => {
+      return translations[lang]?.[key as keyof typeof translations.en] ?? translations.en[key as keyof typeof translations.en] ?? key;
     },
     [lang]
   );
 
   const i18nValue = useMemo(() => ({ lang, t, setLang: handleSetLang }), [lang, t, handleSetLang]);
 
+  // 显示迁移通知（旧版「永不锁定」自动迁移后的一次性提示）
+  useEffect(() => {
+    if (vault.locked) return;
+    vault.consumeMigrationNotice().then((notice) => {
+      if (notice) setToast(notice);
+    }).catch(() => {});
+  }, [vault.locked]);
+
   // Show toast error for vault errors
   useEffect(() => {
     if (vault.lastError) {
       console.error(vault.lastError);
-      // Show inline toast
-      const toast = document.createElement("div");
-      toast.textContent = vault.lastError;
-      toast.style.cssText = `
-        position: fixed; top: 16px; right: 16px; z-index: 9999;
-        padding: 12px 20px; border-radius: 12px; background: #ff3b30; color: white;
-        font-size: 14px; font-family: -apple-system, sans-serif;
-        box-shadow: 0 4px 16px rgba(255,59,48,0.3); max-width: 400px;
-        word-break: break-word; cursor: pointer;
-      `;
-      toast.onclick = () => toast.remove();
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 8000);
+      setToast(vault.lastError);
+      const timer = setTimeout(() => setToast(null), 8000);
+      return () => clearTimeout(timer);
     }
   }, [vault.lastError]);
 
-  // Show filtered entries
-  const displayedEntries = selectedFolder
-    ? vault.entries.filter((e) => e.folder === selectedFolder)
+  useEffect(() => {
+    if (selectedFolder && !vault.folders.some((folder) => folder.id === selectedFolder)) {
+      setSelectedFolder(null);
+    }
+  }, [selectedFolder, vault.folders]);
+
+  useEffect(() => {
+    if (selectedEntry && !vault.entries.some((entry) => entry.id === selectedEntry.id)) {
+      setSelectedEntry(null);
+      setIsCreating(false);
+    }
+  }, [selectedEntry, vault.entries]);
+
+  const selectedFolderIds = useMemo(() => {
+    if (!selectedFolder) {
+      return null;
+    }
+
+    const ids = new Set<string>([selectedFolder]);
+    const queue = [selectedFolder];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      for (const folder of vault.folders) {
+        if (folder.parentId === currentId && !ids.has(folder.id)) {
+          ids.add(folder.id);
+          queue.push(folder.id);
+        }
+      }
+    }
+
+    return ids;
+  }, [selectedFolder, vault.folders]);
+
+  const displayedEntries = selectedFolderIds
+    ? vault.entries.filter((entry) => entry.folder && selectedFolderIds.has(entry.folder))
     : vault.entries;
+
+  const toastNode = toast ? (
+    <div
+      style={{
+        position: "fixed",
+        top: 16,
+        right: 16,
+        zIndex: 9999,
+        padding: "12px 20px",
+        borderRadius: 12,
+        background: "#ff3b30",
+        color: "white",
+        fontSize: 14,
+        fontFamily: "-apple-system, sans-serif",
+        boxShadow: "0 4px 16px rgba(255,59,48,0.3)",
+        maxWidth: 400,
+        wordBreak: "break-word",
+        cursor: "pointer",
+      }}
+      onClick={() => setToast(null)}
+    >
+      {toast}
+    </div>
+  ) : null;
 
   if (error) {
     return (
@@ -147,62 +215,69 @@ export default function App() {
   if (vault.locked) {
     return (
       <I18nContext.Provider value={i18nValue}>
-        <LockScreen
-          initialized={vault.initialized}
-          onSetup={vault.setupPassword}
-          onUnlock={vault.unlock}
-        />
+        <>
+          {toastNode}
+          <LockScreen
+            initialized={vault.initialized}
+            onSetup={vault.setupPassword}
+            onUnlock={vault.unlock}
+            onResetVault={vault.resetVault}
+          />
+        </>
       </I18nContext.Provider>
     );
   }
 
   return (
     <I18nContext.Provider value={i18nValue}>
-      <div className="app-layout">
-        <Sidebar
-          view={view}
-          filter={filter}
-          folders={vault.folders}
-          selectedFolder={selectedFolder}
-          onViewChange={setView}
-          onFilterChange={setFilter}
-          onFolderSelect={setSelectedFolder}
-          onLock={vault.lock}
-        />
-        <main className="main-content">
-          {view === "vault" && (
-            <div className="vault-layout">
-              <VaultList
-                entries={displayedEntries}
-                filter={filter}
-                selectedId={selectedEntry?.id || null}
-                searchQuery={searchQuery}
-                onSearch={handleSearch}
-                onSelect={handleSelectEntry}
-                onNew={handleNewEntry}
-              />
-              <VaultDetail
-                entry={selectedEntry}
-                isNew={isCreating}
+      <>
+        {toastNode}
+        <div className="app-layout">
+          <Sidebar
+            view={view}
+            filter={filter}
+            folders={vault.folders}
+            selectedFolder={selectedFolder}
+            onViewChange={setView}
+            onFilterChange={setFilter}
+            onFolderSelect={setSelectedFolder}
+            onLock={vault.lock}
+          />
+          <main className="main-content">
+            {view === "vault" && (
+              <div className="vault-layout">
+                <VaultList
+                  entries={displayedEntries}
+                  filter={filter}
+                  selectedId={selectedEntry?.id || null}
+                  searchQuery={searchQuery}
+                  onSearch={handleSearch}
+                  onSelect={handleSelectEntry}
+                  onNew={handleNewEntry}
+                />
+                <VaultDetail
+                  entry={selectedEntry}
+                  isNew={isCreating}
+                  onSave={handleSave}
+                  onDelete={vault.deleteEntry}
+                  onCancel={handleCancel}
+                />
+              </div>
+            )}
+            {view === "generator" && <Generator />}
+            {view === "settings" && (
+              <Settings
+                settings={vault.settings}
                 folders={vault.folders}
-                onSave={handleSave}
-                onDelete={vault.deleteEntry}
-                onCancel={handleCancel}
+                onSaveSettings={vault.saveSettings}
+                onSaveFolder={vault.saveFolder}
+                onDeleteFolder={vault.deleteFolder}
+                onChangeMasterPassword={vault.changeMasterPassword}
               />
-            </div>
-          )}
-          {view === "generator" && <Generator />}
-          {view === "settings" && (
-            <Settings
-              settings={vault.settings}
-              folders={vault.folders}
-              onSaveSettings={vault.saveSettings}
-              onSaveFolder={vault.saveFolder}
-              onDeleteFolder={vault.deleteFolder}
-            />
-          )}
-        </main>
-      </div>
+            )}
+          </main>
+        </div>
+      </>
     </I18nContext.Provider>
   );
 }

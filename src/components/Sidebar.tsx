@@ -1,5 +1,6 @@
 import { useI18n } from "../hooks/useI18n";
-import type { View, VaultFilter, Folder } from "../types";
+import { useFolders } from "../hooks/useFolders";
+import type { View, VaultFilter, Folder, FolderNode } from "../types";
 
 interface SidebarProps {
   view: View;
@@ -23,6 +24,7 @@ export default function Sidebar({
   onLock,
 }: SidebarProps) {
   const { t } = useI18n();
+  const { tree, expanded, toggleExpanded } = useFolders(folders);
 
   return (
     <aside className="sidebar">
@@ -79,22 +81,22 @@ export default function Sidebar({
           {t("favorites")}
         </button>
 
-        {folders.length > 0 && (
+        {tree.length > 0 && (
           <div className="nav-divider">
             <span>{t("folders")}</span>
           </div>
         )}
-        {folders.map((f) => (
-          <button
-            key={f.id}
-            className={`nav-item ${selectedFolder === f.id ? "active" : ""}`}
-            onClick={() => { onViewChange("vault"); onFilterChange("all"); onFolderSelect(f.id); }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            {f.name}
-          </button>
+        {tree.map((node) => (
+          <FolderTreeItem
+            key={node.id}
+            node={node}
+            selectedFolder={selectedFolder}
+            expanded={expanded}
+            onToggle={toggleExpanded}
+            onSelect={onFolderSelect}
+            onViewChange={onViewChange}
+            onFilterChange={onFilterChange}
+          />
         ))}
 
         <div className="nav-divider">
@@ -131,5 +133,67 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+interface FolderTreeItemProps {
+  node: FolderNode;
+  selectedFolder: string | null;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (folder: string | null) => void;
+  onViewChange: (view: View) => void;
+  onFilterChange: (filter: VaultFilter) => void;
+}
+
+function FolderTreeItem({
+  node,
+  selectedFolder,
+  expanded,
+  onToggle,
+  onSelect,
+  onViewChange,
+  onFilterChange,
+}: FolderTreeItemProps) {
+  const isExpanded = expanded.has(node.id);
+  const hasChildren = node.children.length > 0;
+
+  return (
+    <>
+      <button
+        className={`nav-item folder-item ${selectedFolder === node.id ? "active" : ""}`}
+        style={{ paddingLeft: `${12 + node.depth * 16}px` }}
+        onClick={() => { onViewChange("vault"); onFilterChange("all"); onSelect(node.id); }}
+      >
+        {hasChildren && (
+          <span
+            className="folder-toggle"
+            onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
+          >
+            {isExpanded ? "▼" : "▶"}
+          </span>
+        )}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        </svg>
+        <span className="folder-name">{node.name}</span>
+      </button>
+      {isExpanded && hasChildren && (
+        <div className="folder-children">
+          {node.children.map((child: FolderNode) => (
+            <FolderTreeItem
+              key={child.id}
+              node={child}
+              selectedFolder={selectedFolder}
+              expanded={expanded}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              onViewChange={onViewChange}
+              onFilterChange={onFilterChange}
+            />
+          ))}
+        </div>
+      )}
+    </>
   );
 }
