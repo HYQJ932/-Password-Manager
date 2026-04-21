@@ -9,32 +9,42 @@ const AMBIGUOUS: &str = "0OlI1";
 
 const ADJECTIVES: &[&str] = &[
     "brave", "calm", "eager", "fancy", "gentle", "happy", "jolly", "kind", "lively", "merry",
-    "nice", "proud", "quick", "silly", "witty", "zealous", "bold", "cool", "dark", "fair",
-    "grand", "keen", "neat", "pure", "rare", "safe", "tall", "vast", "warm", "wise",
-    "bright", "clever", "fierce", "golden", "humble", "iron", "jade", "lunar", "noble", "swift",
+    "nice", "proud", "quick", "silly", "witty", "zealous", "bold", "cool", "dark", "fair", "grand",
+    "keen", "neat", "pure", "rare", "safe", "tall", "vast", "warm", "wise", "bright", "clever",
+    "fierce", "golden", "humble", "iron", "jade", "lunar", "noble", "swift",
 ];
 
 const NOUNS: &[&str] = &[
-    "bear", "cloud", "dawn", "eagle", "flame", "grove", "hawk", "isle", "jewel", "knight",
-    "lake", "moon", "nest", "oak", "peak", "reef", "star", "tide", "vale", "wave",
-    "wolf", "arch", "bell", "cave", "dune", "fern", "glen", "helm", "ivy", "jade",
-    "lark", "mist", "nova", "opal", "pine", "rose", "sage", "thorn", "urn", "vine",
+    "bear", "cloud", "dawn", "eagle", "flame", "grove", "hawk", "isle", "jewel", "knight", "lake",
+    "moon", "nest", "oak", "peak", "reef", "star", "tide", "vale", "wave", "wolf", "arch", "bell",
+    "cave", "dune", "fern", "glen", "helm", "ivy", "jade", "lark", "mist", "nova", "opal", "pine",
+    "rose", "sage", "thorn", "urn", "vine",
 ];
 
-/// Generate a password based on config
 pub fn generate_password(config: &PasswordGeneratorConfig) -> GeneratedPassword {
     let mut charset = String::new();
-    if config.uppercase { charset.push_str(UPPERCASE); }
-    if config.lowercase { charset.push_str(LOWERCASE); }
-    if config.numbers { charset.push_str(NUMBERS); }
-    if config.symbols { charset.push_str(SYMBOLS); }
+    if config.uppercase {
+        charset.push_str(UPPERCASE);
+    }
+    if config.lowercase {
+        charset.push_str(LOWERCASE);
+    }
+    if config.numbers {
+        charset.push_str(NUMBERS);
+    }
+    if config.symbols {
+        charset.push_str(SYMBOLS);
+    }
 
     if charset.is_empty() {
         charset.push_str(LOWERCASE);
     }
 
     let chars: Vec<char> = if config.exclude_ambiguous {
-        charset.chars().filter(|c| !AMBIGUOUS.contains(*c)).collect()
+        charset
+            .chars()
+            .filter(|c| !AMBIGUOUS.contains(*c))
+            .collect()
     } else {
         charset.chars().collect()
     };
@@ -44,33 +54,47 @@ pub fn generate_password(config: &PasswordGeneratorConfig) -> GeneratedPassword 
         .map(|_| chars[rng.gen_range(0..chars.len())])
         .collect();
 
-    let strength = evaluate_strength(&password, config);
+    let strength = evaluate_strength(&password);
 
     GeneratedPassword { password, strength }
 }
 
-fn evaluate_strength(password: &str, config: &PasswordGeneratorConfig) -> String {
+fn evaluate_strength(password: &str) -> String {
     let mut score = 0u32;
-    let len = password.len() as u32;
+    let len = password.chars().count() as u32;
 
-    if len >= 8 { score += 1; }
-    if len >= 12 { score += 1; }
-    if len >= 16 { score += 1; }
-    if len >= 24 { score += 1; }
+    if len >= 8 {
+        score += 1;
+    }
+    if len >= 12 {
+        score += 1;
+    }
+    if len >= 16 {
+        score += 1;
+    }
 
-    let mut categories = 0;
-    if config.uppercase { categories += 1; }
-    if config.lowercase { categories += 1; }
-    if config.numbers { categories += 1; }
-    if config.symbols { categories += 1; }
-    score += categories;
+    if password.chars().any(|c| c.is_ascii_lowercase()) {
+        score += 1;
+    }
+    if password.chars().any(|c| c.is_ascii_uppercase()) {
+        score += 1;
+    }
+    if password.chars().any(|c| c.is_ascii_digit()) {
+        score += 1;
+    }
+    if password.chars().any(|c| !c.is_ascii_alphanumeric()) {
+        score += 1;
+    }
 
-    if score <= 3 { "weak".to_string() }
-    else if score <= 5 { "medium".to_string() }
-    else { "strong".to_string() }
+    if score <= 3 {
+        "weak".to_string()
+    } else if score <= 5 {
+        "medium".to_string()
+    } else {
+        "strong".to_string()
+    }
 }
 
-/// Generate a random username
 pub fn generate_username(config: &UsernameConfig) -> String {
     let mut rng = rand::thread_rng();
 
@@ -83,5 +107,18 @@ pub fn generate_username(config: &UsernameConfig) -> String {
         "word_word" => format!("{}_{}", adj, noun),
         "word.word" => format!("{}.{}", adj, noun),
         _ => format!("{}{}{}", adj, noun, num),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn evaluate_strength_should_score_by_actual_characters() {
+        assert_eq!(evaluate_strength("abcdefgh"), "weak");
+        assert_eq!(evaluate_strength("Abc123!"), "medium");
+        assert_eq!(evaluate_strength("AbcdefghijK1"), "medium");
+        assert_eq!(evaluate_strength("Abcdef123!@#XYZ1"), "strong");
     }
 }

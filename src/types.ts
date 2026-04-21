@@ -18,6 +18,13 @@ export interface VaultEntry {
 export interface Folder {
   id: string;
   name: string;
+  parentId: string | null;
+  sortOrder?: number;
+}
+
+export interface FolderNode extends Folder {
+  children: FolderNode[];
+  depth: number;
 }
 
 export type Language = "en" | "zh";

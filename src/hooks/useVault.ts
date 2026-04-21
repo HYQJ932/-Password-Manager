@@ -45,6 +45,35 @@ export function useVault() {
     setEntries([]);
   }, []);
 
+  const changeMasterPassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    try {
+      await invoke("change_master_password", { currentPassword, newPassword });
+      setLastError(null);
+    } catch (e) {
+      setLastError(`修改主密码失败: ${String(e)}`);
+      throw e;
+    }
+  }, []);
+
+  const resetVault = useCallback(async () => {
+    try {
+      await invoke("reset_vault");
+      setLocked(true);
+      setInitialized(false);
+      setEntries([]);
+      setFolders([]);
+      setSettingsState({
+        autoLockMinutes: 5,
+        darkMode: false,
+        language: "zh",
+      });
+      setLastError(null);
+    } catch (e) {
+      setLastError(`重置保险库失败: ${String(e)}`);
+      throw e;
+    }
+  }, []);
+
   const loadEntries = useCallback(async () => {
     try {
       const result = await invoke<VaultEntry[]>("get_all_entries");
@@ -81,19 +110,37 @@ export function useVault() {
   }, [loadEntries]);
 
   const loadFolders = useCallback(async () => {
-    const result = await invoke<Folder[]>("get_folders");
-    setFolders(result);
+    try {
+      const result = await invoke<Folder[]>("get_folders");
+      setFolders(result);
+      setLastError(null);
+    } catch (e) {
+      setLastError(`加载文件夹失败: ${String(e)}`);
+      throw e;
+    }
   }, []);
 
   const saveFolder = useCallback(async (folder: Folder) => {
-    await invoke("save_folder", { folder });
-    await loadFolders();
+    try {
+      await invoke("save_folder", { folder });
+      setLastError(null);
+      await loadFolders();
+    } catch (e) {
+      setLastError(`保存文件夹失败: ${String(e)}`);
+      throw e;
+    }
   }, [loadFolders]);
 
-  const deleteFolder = useCallback(async (id: string) => {
-    await invoke("delete_folder", { id });
-    await loadFolders();
-  }, [loadFolders]);
+  const deleteFolder = useCallback(async (id: string, strategy: string = "merge_up") => {
+    try {
+      await invoke("delete_folder", { id, strategy });
+      setLastError(null);
+      await Promise.all([loadFolders(), loadEntries()]);
+    } catch (e) {
+      setLastError(`删除文件夹失败: ${String(e)}`);
+      throw e;
+    }
+  }, [loadEntries, loadFolders]);
 
   const loadSettings = useCallback(async () => {
     const result = await invoke<AppSettings>("get_settings");
@@ -103,6 +150,14 @@ export function useVault() {
   const saveSettings = useCallback(async (s: AppSettings) => {
     await invoke("save_settings", { settings: s });
     setSettingsState(s);
+  }, []);
+
+  const consumeMigrationNotice = useCallback(async () => {
+    try {
+      return await invoke<string | null>("consume_migration_notice");
+    } catch {
+      return null;
+    }
   }, []);
 
   return {
@@ -116,6 +171,8 @@ export function useVault() {
     setupPassword,
     unlock,
     lock,
+    changeMasterPassword,
+    resetVault,
     loadEntries,
     saveEntry,
     deleteEntry,
@@ -123,5 +180,6 @@ export function useVault() {
     saveFolder,
     deleteFolder,
     saveSettings,
+    consumeMigrationNotice,
   };
 }

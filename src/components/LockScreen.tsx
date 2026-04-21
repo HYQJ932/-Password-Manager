@@ -5,9 +5,15 @@ interface LockScreenProps {
   initialized: boolean;
   onSetup: (password: string) => Promise<void>;
   onUnlock: (password: string) => Promise<boolean>;
+  onResetVault: () => Promise<void>;
 }
 
-export default function LockScreen({ initialized, onSetup, onUnlock }: LockScreenProps) {
+export default function LockScreen({
+  initialized,
+  onSetup,
+  onUnlock,
+  onResetVault,
+}: LockScreenProps) {
   const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -38,6 +44,29 @@ export default function LockScreen({ initialized, onSetup, onUnlock }: LockScree
           setError(t("incorrectPassword"));
         }
       }
+    } catch (err) {
+      setError(String(err));
+    }
+    setLoading(false);
+  };
+
+  const handleResetVault = async () => {
+    if (!window.confirm(t("resetVaultConfirm"))) {
+      return;
+    }
+
+    const verifyText = window.prompt(t("resetVaultTypeResetPrompt")) ?? "";
+    if (verifyText.trim().toUpperCase() !== "RESET") {
+      setError(t("resetVaultTypeResetMismatch"));
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      await onResetVault();
+      setPassword("");
+      setConfirm("");
     } catch (err) {
       setError(String(err));
     }
@@ -79,6 +108,16 @@ export default function LockScreen({ initialized, onSetup, onUnlock }: LockScree
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? "..." : initialized ? t("unlock") : t("createVault")}
           </button>
+          {initialized && (
+            <button
+              type="button"
+              className="btn-text"
+              onClick={handleResetVault}
+              disabled={loading}
+            >
+              {t("forgotMasterPassword")}
+            </button>
+          )}
         </form>
       </div>
     </div>

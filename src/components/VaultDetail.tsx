@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useI18n } from "../hooks/useI18n";
 import { useClipboard } from "../hooks/useClipboard";
-import type { VaultEntry, EntryType, Folder } from "../types";
+import { useFolders, flattenTree } from "../hooks/useFolders";
+import { PasswordGeneratorPanel } from "./PasswordGeneratorPanel";
+import { UsernameGeneratorPanel } from "./UsernameGeneratorPanel";
+import { StrengthBadge, scorePassword } from "./StrengthBadge";
+import type { VaultEntry, EntryType } from "../types";
 
 interface VaultDetailProps {
   entry: VaultEntry | null;
   isNew: boolean;
-  folders: Folder[];
   onSave: (entry: VaultEntry) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onCancel: () => void;
@@ -30,20 +33,24 @@ const emptyEntry: VaultEntry = {
 export default function VaultDetail({
   entry,
   isNew,
-  folders,
   onSave,
   onDelete,
   onCancel,
 }: VaultDetailProps) {
   const { t } = useI18n();
+  const { tree } = useFolders();
   const [form, setForm] = useState<VaultEntry>(entry || { ...emptyEntry });
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [genPasswordOpen, setGenPasswordOpen] = useState(false);
+  const [genUsernameOpen, setGenUsernameOpen] = useState(false);
   const { copied, copy } = useClipboard();
 
   useEffect(() => {
     setForm(entry || { ...emptyEntry });
     setShowPassword(false);
+    setGenPasswordOpen(false);
+    setGenUsernameOpen(false);
   }, [entry, isNew]);
 
   const update = (field: keyof VaultEntry, value: any) => {
@@ -66,6 +73,8 @@ export default function VaultDetail({
       onCancel();
     }
   };
+
+  const flattenedFolders = flattenTree(tree);
 
   if (!entry && !isNew) {
     return (
@@ -147,12 +156,21 @@ export default function VaultDetail({
                   onChange={(e) => update("username", e.target.value)}
                   placeholder="user@example.com"
                 />
+                <button className="btn-generate" onClick={() => setGenUsernameOpen(!genUsernameOpen)} title={t("generate")}>
+                  ⚡
+                </button>
                 {form.username && (
                   <button className="btn-copy" onClick={() => copy(form.username!)}>
                     {copied ? t("copied") : t("copy")}
                   </button>
                 )}
               </div>
+              {genUsernameOpen && (
+                <UsernameGeneratorPanel
+                  onApply={(username) => { update("username", username); setGenUsernameOpen(false); }}
+                  onClose={() => setGenUsernameOpen(false)}
+                />
+              )}
             </div>
 
             <div className="field-group">
@@ -167,12 +185,22 @@ export default function VaultDetail({
                 <button className="btn-icon" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? t("hide") : t("show")}
                 </button>
+                <button className="btn-generate" onClick={() => setGenPasswordOpen(!genPasswordOpen)} title={t("generate")}>
+                  ⚡
+                </button>
                 {form.password && (
                   <button className="btn-copy" onClick={() => copy(form.password!)}>
                     {copied ? t("copied") : t("copy")}
                   </button>
                 )}
               </div>
+              <StrengthBadge level={scorePassword(form.password ?? "")} />
+              {genPasswordOpen && (
+                <PasswordGeneratorPanel
+                  onApply={(password) => { update("password", password); setGenPasswordOpen(false); }}
+                  onClose={() => setGenPasswordOpen(false)}
+                />
+              )}
             </div>
 
             <div className="field-group">
@@ -201,12 +229,22 @@ export default function VaultDetail({
                 <button className="btn-icon" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? t("hide") : t("show")}
                 </button>
+                <button className="btn-generate" onClick={() => setGenPasswordOpen(!genPasswordOpen)} title={t("generate")}>
+                  ⚡
+                </button>
                 {form.apiKey && (
                   <button className="btn-copy" onClick={() => copy(form.apiKey!)}>
                     {copied ? t("copied") : t("copy")}
                   </button>
                 )}
               </div>
+              <StrengthBadge level={scorePassword(form.apiKey ?? "")} />
+              {genPasswordOpen && (
+                <PasswordGeneratorPanel
+                  onApply={(apiKey) => { update("apiKey", apiKey); setGenPasswordOpen(false); }}
+                  onClose={() => setGenPasswordOpen(false)}
+                />
+              )}
             </div>
 
             <div className="field-group">
@@ -228,8 +266,8 @@ export default function VaultDetail({
             onChange={(e) => update("folder", e.target.value || null)}
           >
             <option value="">{t("noFolder")}</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
+            {flattenedFolders.map((n) => (
+              <option key={n.id} value={n.id}>{"\u00a0\u00a0".repeat(n.depth)}{n.name}</option>
             ))}
           </select>
         </div>

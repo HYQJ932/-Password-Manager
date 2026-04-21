@@ -29,6 +29,8 @@ pub struct VaultEntry {
 pub struct Folder {
     pub id: String,
     pub name: String,
+    pub parent_id: Option<String>,
+    pub sort_order: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,7 +42,9 @@ pub struct AppSettings {
     pub language: String,
 }
 
-fn default_language() -> String { "zh".to_string() }
+fn default_language() -> String {
+    "zh".to_string()
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
